@@ -5,6 +5,7 @@
 ### Overview
 
 The pipeline consists of a few main steps:
+
 - *(optional step)* pre-rarefaction of the reads for large samples `00_rarefy.sh`
 - quality check on the raw reads `01_fastqc_preproc.sh` and `01_multiqc_preproc.sh`
 - pre-processing of the reads with dada2 (primer removal, length and quality trimming) `02_preprocessing.sh`
@@ -56,21 +57,23 @@ Before running the pipeline, you need to prepare your data:
 ### Adapting the scripts
 
 Only the `.sh` scripts need to be modified. You will need to modify the beginning of these scripts:
+
 - modify the commands to initialize conda according to the type of installation you are using
 - modify the input variables, for instance the path to the root directory
 - the fastQC scripts are array jobs (argument `--array` in the slurm header), so you need to modify the range of the arrays. `2-50` means you will process files described in lines 2 to 50 of `config/metadata.tsv`. We start at 2 to skip the header. So your array range should be `2-<number of samples>+1`
 - you should not need to modify the resource requirements, unless your jobs get killed.
 
 On top of this, each script requires some specific customization to match your specific data:
-- `01_fastqc_preproc.sh` and `02_slurm_preprocessing.sh`: depending on whether you rarefied your raw reads or not, modify the `reads` variable
-- `02_preprocessing.sh`:
 
-| Variable           | Description                                       | Default Value                                          | Modification Required? |
-|--------------------|---------------------------------------------------|--------------------------------------------------------|-------------------------|
-| `fwd_primer`        | Forward primer sequence                            | `AGRGTTYGATYMTGGCTCAG`                                  | Yes, adjust to your primers. |
-| `rev_primer`        | Reverse primer sequence                            | `RGYTACCTTGTTACGACTT`                                  | Yes, adjust to your primers. |
-| `minLen`            | Minimum read length for filtering                  | `1000`                                                  | Yes, adjust as needed.  |
-| `maxLen`            | Maximum read length for filtering                  | `1600`                                                  | Yes, adjust as needed.  |
+- `01_fastqc_preproc.sh` and `02_slurm_preprocessing.sh`: depending on whether you rarefied your raw reads or not, modify the `reads` variable
+- `02_preprocessing.sh` for example:
+
+| Variable           | Description                                       | Default Value                                          |
+|--------------------|---------------------------------------------------|--------------------------------------------------------|
+| `fwd_primer`        | Forward primer sequence                            | `AGRGTTYGATYMTGGCTCAG`                                  |
+| `rev_primer`        | Reverse primer sequence                            | `RGYTACCTTGTTACGACTT`                                  |
+| `minLen`            | Minimum read length for filtering                  | `1000`                                                  |
+| `maxLen`            | Maximum read length for filtering                  | `1600`                                                  |
 
 ### Running the Pipeline
 
