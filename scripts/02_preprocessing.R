@@ -82,27 +82,6 @@ registerDoParallel(cl)
 
 
 
-# ### QC of all raw reads ###
-# # do this step with fastQC and multiQC because more memory-efficient
-# print("QC of the raw reads")
-
-# # per sample
-# splits <- split(raw_reads_paths, ceiling(seq_along(raw_reads_paths)/12)) # splitting into chunks of 12 samples for optimal visualization
-
-# x <- foreach(i = seq_along(splits), .packages = c("ggplot2", "dada2")) %dopar% {
-#   plot.quals <- plotQualityProfile(splits[[i]])
-#   ggsave(file.path(out.plots, paste0("01_QC_raw_individual_chunk", i, ".pdf")),
-#          plot.quals, device = "pdf", width = 11, height = 8)
-# }
-
-# # aggregated
-# plot.quals.agg <- plotQualityProfile(raw_reads_paths, aggregate = TRUE)
-# ggsave(file.path(out.plots, "01_QC_raw_aggregated.pdf"), plot.quals.agg, device="pdf", width = 8, height = 8) # 1 panel in a A4 landscape page
-
-# print("QC of the raw reads done")
-
-
-
 ### Orient sequences and trim primers ###
 
 print("Orienting sequences and trimming primers")
@@ -126,6 +105,7 @@ primer_removal_summary <- foreach(i = seq_along(raw_reads_paths), .packages = c(
 print(paste0("Mean proportion of reads removed: ", round(mean(primer_removal_summary[,"reads.out"]/primer_removal_summary[,"reads.in"]),2)))
 
 saveRDS(primer_removal_summary, file.path(out.preproc, "primer_removal_summary.rds"))
+# primer_removal_summary <- readRDS(file.path(out.preproc, "primer_removal_summary.rds"))
 
 primers_summary <- as.data.frame(primer_removal_summary)
 primers_summary <- primers_summary %>%
@@ -166,25 +146,6 @@ filtering_summary <- filtering_summary %>%
 
 print("Trimming and filtering reads done")
 
-
-# ### Post-processing QC ###
-# # do this step with fastQC and multiQC because more memory-efficient
-# print("Post-processing QC")
-
-# # per sample
-# splits <- split(filtered_trimmed_reads_paths, ceiling(seq_along(filtered_trimmed_reads_paths)/12)) # splitting into chunks of 12 samples for optimal visualization
-
-# x <- foreach(i = seq_along(splits), .packages = c("ggplot2", "dada2")) %dopar% {
-#   plot.quals <- plotQualityProfile(splits[[i]])
-#   ggsave(file.path(out.plots, paste0("01_QC_processed_individual_chunk", i, ".pdf")),
-#          plot.quals, device = "pdf", width = 11, height = 8)
-# }
-
-# # aggregated
-# plot.quals.agg <- plotQualityProfile(filtered_trimmed_reads_paths, aggregate = TRUE)
-# ggsave(file.path(out.plots, "01_QC_processed_aggregated.pdf"), plot.quals.agg, device="pdf", width = 8, height = 8) # 1 panel in a A4 landscape page
-
-# print("Post-processing QC done")
 
 ### Summary stats on number of reads and read length ###
 

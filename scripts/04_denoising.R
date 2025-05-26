@@ -246,6 +246,15 @@ qd.plot <- ggplot(
 ggsave(file.path(out.plots, "02_sampling_coverage.pdf"), sc.plot, device="pdf", width = 8, height = 6)
 ggsave(file.path(out.plots, "02_rarefaction_curves.pdf"), qd.plot, device="pdf", width = 10, height = 8)
 
+write.table(
+  inextqd,
+  file = file.path(out.denois, "inext_data.tsv"),
+  sep = "\t",
+  quote = F,
+  row.names = F,
+  col.names = T
+)
+
 ### Compute general statistics ###
 
 print("Plotting global statistics")

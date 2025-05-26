@@ -4,7 +4,7 @@
 #SBATCH --nodes 1
 #SBATCH --ntasks 1
 #SBATCH --cpus-per-task 4
-#SBATCH --mem 52000
+#SBATCH --mem 64000
 #SBATCH --partition cpu
 #SBATCH --time 02:00:00
 #SBATCH --error /work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/logs/02_preprocessing.log

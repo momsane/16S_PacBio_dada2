@@ -97,7 +97,16 @@ On top of this, each script requires some specific customization to match your s
 To run each script:
 
 1.  **Submit the job to the slurm scheduler:** use `sbatch <script_name>.sh`.
-2.  **Monitor the job:** use `Squeue` to check the status of you jobs. Check the logs for progress and errors. 
+2.  **Monitor the job:** use `Squeue` to check the status of you jobs. After each step, check the logs for errors. 
+    
+| Script           | What to check                                       |
+|--------------------|---------------------------------------------------|
+| `00_rarefy.sh`        | Size of output fastQ files is > 0                            |
+| `01_fastqc_preproc.sh` & `03_fastqc_postproc.sh`      | Combine all logs into a single file and check that "Analysis complete" appears as many times as samples: `cat ../../logs/01_fastqc_preproc/*.log > ../../logs/01_fastqc_preproc/combined_logs.log; grep -c "Analysis complete" ../../logs/01_fastqc_preproc/combined_logs.log`                            |
+| `01_multiqc_preproc.sh` & `03_multiqc_postproc.sh`            | Look at HTML report                  |
+| `02_slurm_preprocessing.sh`            | Check for errors in log; check number of fastQ files in results/preprocessing/primerfree_reads & results/preprocessing/trimmed_filtered_reads; check output plot                  |
+| `04_slurm_denoising.sh`            | Check for errors in log; check output plots                  |
+
 
 
 ---

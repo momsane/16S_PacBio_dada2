@@ -7,7 +7,7 @@
 #SBATCH --mem 1000
 #SBATCH --partition cpu
 #SBATCH --time 00:20:00
-#SBATCH --array=2-55
+#SBATCH --array=2-232
 #SBATCH --error /work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/logs/03_fastqc_postproc/%a.log
 #SBATCH --output /work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/logs/03_fastqc_postproc/%a.log
 
