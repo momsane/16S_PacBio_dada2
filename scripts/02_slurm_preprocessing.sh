@@ -23,8 +23,8 @@ conda activate R # Activate Conda env
 root=/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis
 script="$root"/workflow/scripts/02_preprocessing.R
 
-#reads="$root"/data/raw_reads # if you did not pre-rarefy
-reads="$root"/results/prerarefied_reads # if you pre-rarefied
+#raw_fastq_dir="$root"/data/raw_reads # if you did not pre-rarefy
+raw_fastq_dir="$root"/results/prerarefied_reads # if you pre-rarefied
 
 fwd_primer=AGRGTTYGATYMTGGCTCAG
 rev_primer=RGYTACCTTGTTACGACTT
@@ -36,7 +36,7 @@ out_plots="$root"/plots
 # Execute the R script
 
 echo "Parameters:"
-echo input.raw: "$reads"
+echo input.raw: "$raw_fastq_dir"
 echo fwd.primer: "$fwd_primer"
 echo rev.primer: "$rev_primer"
 echo minLen: "$minLen"
@@ -47,7 +47,7 @@ echo out.plots: "$out_plots"
 echo "Refer to the Rscript for information on the parameters"
 
 Rscript --vanilla "$script" \
-    "$reads" \
+    "$raw_fastq_dir" \
     "$fwd_primer" \
     "$rev_primer" \
     "$minLen" \

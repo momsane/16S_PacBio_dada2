@@ -41,7 +41,7 @@ First, you will create a working directory with the following structure:
 
 #### Conda environments
 
-You'll need access to a conda installation on your cluster. You can either have yours, installed for instance through miniforge3, or use the one provided by the cluster. This will change slightly how you activate environments at the beginning of the scripts. To use the cluster conda, follow the instructions [here](https://wiki.unil.ch/ci/books/high-performance-computing-hpc/page/using-conda-and-anaconda). To use your own conda installation, you just need to modify the `$CONDA_HOME` variable in the scripts.
+You'll need access to a conda installation on your cluster. You can either have yours, installed for instance through miniforge3/miniconda3, or use the one provided by the cluster. This will change slightly how you activate environments at the beginning of the scripts. To use the cluster conda, follow the instructions [here](https://wiki.unil.ch/ci/books/high-performance-computing-hpc/page/using-conda-and-anaconda). To use your own conda installation, you just need to modify the `$CONDA_HOME` variable in the scripts.
 
 Install the required conda environments using the .yaml files located in envs with the command `conda env create -f envs/<env>.yaml`.
 
