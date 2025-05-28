@@ -102,9 +102,12 @@ if (rarefy_to == -1){
   ASV_samples_table_noChim2 <- ASV_samples_table_noChim
 } else {
   # rarefy reads
-  print(paste0("Rarefaction to ", rarefy_to, " reads"))
+  print(paste0("Rarefaction to ", rarefy_to, " reads; sample with fewer reads will be kept as is; ASVs with a subsequent total abundance of 0 will be removed"))
   set.seed(42)
-  ASV_samples_table_noChim2 <- Rarefy(ASV_samples_table_noChim, depth = rarefy_to)$otu.tab.rff
+  raref <- Rarefy(ASV_samples_table_noChim, depth = rarefy_to)
+  ASV_samples_table_noChim2 <- raref$otu.tab.rff 
+  # add samples that did not have enough reads because Rarefy() removes them
+  ASV_samples_table_noChim2 <- rbind(ASV_samples_table_noChim2, ASV_samples_table_noChim[raref$discard, ])
   
   # find ASVs with total abundance of 0
   ab <- apply(ASV_samples_table_noChim2, 2, sum)
@@ -123,48 +126,114 @@ if (rarefy_to == -1){
 
 print(paste0("Using database ", db1, " to assign taxonomy"))
 
-# print("Note: no database for addSpecies with GreenGenes2, but the toSpecies trainset is good enough with full-length 16S for assignTaxonomy.")
+ASV_taxonomy <- assignTaxonomy(
+  seqs = ASV_samples_table_noChim2,
+  refFasta = db1,
+  minBoot = 80,
+  multithread = TRUE,
+  verbose = T)
 
-ASV_taxonomy <- assignTaxonomy(seqs = ASV_samples_table_noChim2, refFasta = db1, multithread = TRUE, verbose = T)
+##### Custom function to assign species
+
+# addSpecies uses exact matches, including length matching
+# but in some cases either the reference sequence or the ASV could be a few nt shorter
+
+addSpecies_custom <- function(seqs, refFasta) {
+  # read inputs as DNAstrings
+  asvs <- DNAStringSet(colnames(seqs))
+  refs <- readDNAStringSet(refFasta)
+  # convert to character for comparison
+  asv_seqs <- as.character(asvs)
+  ref_seqs <- as.character(refs)
+  
+  # extract only the description of the ref sequences
+  full_headers <- names(refs)
+  ref_descriptions <- sub("^[^ ]+\\s+", "", full_headers)  # keep only text after first space character
+  
+  results <- data.frame(ASV = character(0), ASV_index= character(0), ref_match = character(0), stringsAsFactors = FALSE)
+  
+  for (i in seq_along(asv_seqs)) {
+    asv <- asv_seqs[i]
+    
+    # match if ASV is substring of reference or reference is substring of ASV
+    matched <- vapply(ref_seqs, function(ref) {
+      grepl(asv, ref, fixed = TRUE) || grepl(ref, asv, fixed = TRUE)
+    }, logical(1))
+    
+    if (any(matched)) {
+      matched_descriptions <- ref_descriptions[matched]
+      if (length(ref_matches) > 1){
+        print(paste0("Found more than one match for ASV ", asv_name, "; not adding it to the results"))
+      } else {
+        temp_df <- data.frame(ASV = asv,
+                              ASV_index = i,
+                              ref_match = matched_descriptions,
+                              stringsAsFactors = FALSE)
+        results <- rbind(results, temp_df)
+      }
+    }
+  }
+  rownames(results) <- results$ASV
+  return(results[ ,-1])
+}
 
 if (db2 != ""){
   print(paste0("Using database ", db2, " to assign species"))
-  ASV_taxonomy2 <- assignSpecies(ASV_taxonomy, refFasta = db2, verbose = T)
-  colnames(ASV_taxonomy2) <- c("Genus_addSp", "Species_addSp")
+  
+  ASV_taxonomy2 <- addSpecies_custom(seqs = ASV_samples_table_noChim2, refFasta = db2)
+  ASV_taxonomy2 <- ASV_taxonomy2 %>% 
+    separate(ref_match, into = c("Species_addSp", "Strain", "Cluster"), sep = "-", remove = T) %>% 
+    separate(Species_addSp, into = c("Genus_addSp", "Species_addSp"), sep = " ") %>% 
+    select(-"ASV_index")
+  
+  # merge with taxonomy from assignTaxonomy()
   ASV_taxonomy3 <- transform(merge(ASV_taxonomy,ASV_taxonomy2,by=0,all=TRUE), row.names=Row.names, Row.names=NULL)
+  
+  # combine taxonomy from both functions
   ASV_taxonomy3 <- ASV_taxonomy3 %>% 
-    separate("Species_addSp", into = c("Species_addSp", "Strain", "Cluster"), sep = "-", remove = T) %>%
     separate("Genus", into = c(NA,"Genus_clean"), sep = "g__", remove = F) %>% 
     separate("Species", into = c(NA,"Species_clean"), sep = "s__", remove = F) %>% 
-    mutate(Species_clean = if_else(!is.na(Genus_addSp) & Genus_clean == Genus_addSp,Species_addSp,Species_clean)) %>% 
+    mutate(Genus_clean = if_else(!is.na(Genus_addSp),Genus_addSp,Genus_clean)) %>% # overwriting genus with genus from addSpecies if there is a hit
+    mutate(Species_clean = case_when(
+      !is.na(Genus_addSp) ~ Species_addSp,
+      is.na(Genus_addSp) & !is.na(Genus_clean) ~ Species_clean,
+      is.na(Genus_addSp) & is.na(Genus_clean) ~ Species_clean,
+    )) %>% # overwriting species with species from addSpecies if there is a hit
     mutate(Species_full = case_when(
       is.na(Genus_clean) ~ "s__",
       !is.na(Genus_clean) & is.na(Species_clean) ~ paste("s__", Genus_clean, " sp.", sep = ""),
       !is.na(Genus_clean) & !is.na(Species_clean) ~ paste("s__", Genus_clean, " ", Species_clean, sep = "")
-    )) %>% 
-    dplyr::select(-c("Species", "Species_clean", "Genus_clean", "Genus_addSp", "Species_addSp")) %>%
+    )) %>% # rewrite full species name
+    dplyr::select(-c("Species", "Species_clean", "Genus", "Genus_addSp", "Species_addSp")) %>%
+    dplyr::rename(Genus = Genus_clean) %>% 
     dplyr::rename(Species = Species_full) %>% 
     dplyr::relocate("Species", .after = "Genus") %>%
-    mutate(inferred_from = if_else(is.na(Cluster), "assignTaxonomy", "addSpecies")) %>%
+    mutate(inferred_from = if_else(is.na(Cluster), "assignTaxonomy", "addSpecies_custom")) %>%
     arrange(Species)
+  
+  print(paste0("Matched ", nrow(ASV_taxonomy3[ASV_taxonomy3$inferred_from == "addSpecies_custom", ]), " ASV(s) to reference sequences"))
+  
 } else {
-  ASV_taxonomy3 <- as.data.frame(ASV_taxonomy) %>% 
+  ASV_taxonomy3 <- as.data.frame(ASV_taxonomy)
+  if (!("Species" %in% colnames(ASV_taxonomy3))){
+    ASV_taxonomy3$Species <- NA
+  }
+  ASV_taxonomy3 <- ASV_taxonomy3 %>% 
     mutate(Strain = NA) %>%
     mutate(Cluster = NA) %>%
     mutate(inferred_from = "assignTaxonomy")
 }
 
-# special case: Bifidobacterium has a weird name in GreenGenes2
-ASV_taxonomy3$Genus[ASV_taxonomy3$Genus == "g__Bifidobacterium_388777"] <- "g__Bifidobacterium"
+ASV_taxonomy4 <- ASV_taxonomy3 %>% 
+  mutate(ASV = rownames(ASV_taxonomy3), .before = "Kingdom")
 
-
-write.table(ASV_taxonomy3, file.path(out.tax, "ASV_Taxonomy_raw.tsv"), sep = "\t", quote = F, col.names = T, row.names = T)
+write.table(ASV_taxonomy4, file.path(out.tax, "ASV_Taxonomy_raw.tsv"), sep = "\t", quote = F, col.names = T, row.names = F)
 saveRDS(ASV_taxonomy3, file.path(out.tax, "ASV_Taxonomy.RDS"))
 
 print("Finished assigning taxonomy")
 
 
-### Reformat species name to classic nomenclature (with Genus + Species or next assigned taxonomic level) ###
+### Reformat species name ###
 
 print("Reformatting species names")
 print("For ASVs with no assigned genus, the lowest assigned taxonomic rank is used as species name")
@@ -218,13 +287,26 @@ saveRDS(object = ps, file = file.path(out.tax, "phyloseq_object.RDS"))
 
 print("Finished creating and filtering phyloseq object")
 
+### Create a single abundance table ###
+
+tab <- otu_table(ps) # samples are rows and ASV are columns
+class(tab) <- "matrix" # warning but it's fine
+tax <- as.data.frame(tax_table(ps))
+tax <- tax %>% 
+  mutate(ASV = rownames(tax), .before = "Kingdom")
+
+cols <- colnames(tab)
+tab2 <- as.data.frame(tab) %>% 
+  mutate(SampleID = rownames(tab)) %>%
+  pivot_longer(all_of(cols), names_to = "ASV", values_to = "count") %>% 
+  left_join(tax, by = "ASV") %>% 
+  left_join(meta, by = "SampleID")
+
+write.table(tab2, file.path(out.tax, "sample_ASV_table_long.tsv"), sep = "\t", quote = F, col.names = T, row.names = F)
 
 ### Check for single- and doubletons ###
 
 print("Checking for singletons and doubletons - note that singletons may be introduced by rarefaction")
-
-tab <- otu_table(ps) # samples are rows and ASV are columns
-class(tab) <- "matrix" # warning but it's fine
 
 tot <- sort(apply(X=tab, MARGIN=2, sum)) # total abundance of each ASV
 # show ASVs with total abundance of 1 or 2
@@ -236,6 +318,13 @@ extr_sum <- apply(extr, 1, sum) # show only samples in which they are present
 print("Samples in which these ASVs were found:")
 print(tab[names(extr_sum[extr_sum != 0]),sdtons])
 
+# shows ASVs with low prevalence
+tab_bin <- tab
+tab_bin[tab_bin > 0] <- 1
+occ <- sort(apply(X=tab_bin, MARGIN=2, sum))
+low_occ <- names(occ[occ == 1])
+print("The following ASVs appear in only 1 sample:")
+print(tax_table(ps)[low_occ, c("Species", "Strain")])
 
 ### Plotting most abundant taxa ###
 
@@ -243,25 +332,29 @@ print("Plotting most abundant taxa")
 
 top_nested <- nested_top_taxa(
   ps,
+  # subset_samples(ps, SampleID %in% meta$SampleID[meta$SampleType == "colonized_bee"]),
   top_tax_level = "Genus", # most abundant order
   nested_tax_level = "Species", # most abundant genera within those orders
-  n_top_taxa = 6, # top 6 most abundant genera
-  n_nested_taxa = 3 # top 3 most abundant species
-)
+  n_top_taxa = 8, # top 8 most abundant genera
+  n_nested_taxa = 2 # top 2 most abundant species
+  )
 
-tax_plot = plot_nested_bar(ps_obj = top_nested$ps_obj, 
+tax_plot <- plot_nested_bar(ps_obj = top_nested$ps_obj, 
                            top_level = "Genus", nested_level = "Species",
                            legend_title = "Taxonomy") + 
   theme_nested(theme_classic) + ylab("Relative abundance") + 
-  theme(strip.text.x = element_text(angle=90), 
-        strip.background=element_blank(),
-        axis.title.x=element_blank(),
-        axis.text.x=element_blank(),
-        axis.ticks.x=element_blank()) + 
+  theme(
+    #strip.text.x = element_text(angle=90),
+    strip.background=element_blank(),
+    axis.title.x=element_blank(),
+    axis.text.x=element_blank(),
+    axis.ticks.x=element_blank(),
+    legend.key.size = unit(0.4, "cm")
+    ) + 
   guides(fill=guide_legend(ncol =1))
 
-if (facet_var != ""){
-  tax_plot <- tax_plot + facet_wrap(as.formula(paste0("~", facet_var)), drop=T)
+if (facet_vars[1] != ""){
+  tax_plot <- tax_plot + facet_wrap(formula(paste0("~ ", paste(facet_vars, collapse = "+"))), drop=T, scales = "free")
 }
 
 ggsave(file.path(out.plots, "03_taxonomy_barplot.pdf"), tax_plot, device="pdf", width = 8, height = 6)

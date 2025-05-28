@@ -3,8 +3,8 @@
 #SBATCH --account pengel_general_data
 #SBATCH --nodes 1
 #SBATCH --ntasks 1
-#SBATCH --cpus-per-task 8
-#SBATCH --mem 32000
+#SBATCH --cpus-per-task 4
+#SBATCH --mem 16000
 #SBATCH --partition cpu
 #SBATCH --time 02:00:00
 #SBATCH --error /work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/logs/05_assign_taxonomy.log
@@ -24,9 +24,9 @@ root=/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis
 script="$root"/workflow/scripts/05_assign_taxonomy.R
 asvs="$root"/results/denoising/ASV_samples_table_noChim.rds
 metadata="$root"/workflow/config/metadata.tsv
-db1="$root"/data/databases/gg2_2024_09_toSpecies_trainset.fa
-db2=""
-rarefy_to=-1 # -1 means no rarefaction; use the rarefaction curves to set this value to a relevant number
+db1="$root"/data/databases/syncom_custom_db_toSpecies_trainset.fa
+db2="$root"/data/databases/syncom_custom_db_addSpecies.fa
+rarefy_to=-1 # -1 means no rarefaction; use the rarefaction curves to set this value to a relevant number if needed
 facet_var=SampleType
 out_tax="$root"/results/assign_taxonomy
 out_plots="$root"/plots

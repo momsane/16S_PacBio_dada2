@@ -27,25 +27,27 @@ if(!require(iNEXT)){
 
 args <- commandArgs(trailingOnly = TRUE)
 
-if (length(args) != 8){
-  stop(" Usage: 02_denoising.R <processed_reads_dir> <read_count_table> <max_reads_derep> <max_bases_errormodel> <removeSingletons_T_F> <max_reads_raref> <denoise_results_dir> <plots_dir>", call.=FALSE)
+if (length(args) != 9){
+  stop(" Usage: 02_denoising.R <processed_reads_dir> <read_count_table> <max_reads_derep> <error_model> <max_bases_errormodel> <removeSingletons_T_F> <max_reads_raref> <denoise_results_dir> <plots_dir>", call.=FALSE)
 } else {
   input.reads <- args[1] # folder with all pre-processed reads
   input.readcounts <- args[2] # table reporting the number of reads at each step
   maxReads <- args[3] # max number of reads to load at once for dereplication
-  maxBases <- args[4] # max number of bases to use for error model inference
-  removeSingletons <- args[5] # "T" or "F", whether to remove singletons during denoising or not
-  maxraref <- args[6] # maximum number of reads to extrapolate rarefaction curves
-  out.denois <- args[7] # folder to write denoising results
-  out.plots <- args[8] # folder to write plots
+  errModel <- args[4]
+  maxBases <- args[5] # max number of bases to use for error model inference
+  removeSingletons <- args[6] # "T" or "F", whether to remove singletons during denoising or not
+  maxraref <- args[7] # maximum number of reads to extrapolate rarefaction curves
+  out.denois <- args[8] # folder to write denoising results
+  out.plots <- args[9] # folder to write plots
 }
 
 # input.reads <- "/Volumes/gr_Engel/mgarcia/SAGE_tuto_16S_FM_2024/1_Results/preprocessing/trimmed_filtered_reads"
 # input.readcounts <- "/Volumes/gr_Engel/mgarcia/SAGE_tuto_16S_FM_2024/1_Results/preprocessing/read_count_before_after.tsv"
 # maxReads <- 1E6
-# maxBases <- 1E8
+# errModel <- binnedQualErrfun
+# maxBases <- 1E10
 # removeSingletons <- "F"
-# maxraref <- 2000
+# maxraref <- 5000
 # out.denois <- "//Volumes/gr_Engel/mgarcia/SAGE_tuto_16S_FM_2024/1_Results/denoising"
 # out.plots <- "/Volumes/gr_Engel/mgarcia/SAGE_tuto_16S_FM_2024/2_Plots"
 
@@ -84,7 +86,7 @@ print("Building error model")
 set.seed(42)
 error_model <- learnErrors(
   dereps,
-  errorEstimationFunction=PacBioErrfun,
+  errorEstimationFunction=errModel,
   nbases = maxBases,
   randomize = T,
   BAND_SIZE = 32,
