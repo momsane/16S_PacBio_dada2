@@ -51,6 +51,8 @@ dir.create(out.plots, recursive = TRUE, showWarnings = FALSE)
 
 ### Inputs ###
 
+print("Reading inputs and extracting info")
+
 ps <- readRDS(input.ps)
 clusters <- read.table(input.clusters, sep = "\t", header = T)
 meta <- read.table(input.metadata, sep = "\t", header = T)
@@ -124,6 +126,8 @@ df <- df %>%
 
 write.table(df, file.path(out.quant, "strain_quantification_long_table.tsv"), sep = "\t", quote = F, col.names = T, row.names = F)
 
+print("Generating plots")
+
 # generate barplot
 df <- df %>%
   left_join(meta, by = "SampleID")
@@ -190,3 +194,6 @@ if (facet_var[1] != ""){
 
 ggsave(file.path(out.plots, "06_strain_barplot_count.pdf"), p1, device="pdf", width = 8, height = 6)
 ggsave(file.path(out.plots, "06_strain_barplot_relative.pdf"), p2, device="pdf", width = 8, height = 6)
+
+
+print("Strain quantification done")

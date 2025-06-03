@@ -33,7 +33,7 @@ if (length(args) != 9){
   input.reads <- args[1] # folder with all pre-processed reads
   input.readcounts <- args[2] # table reporting the number of reads at each step
   maxReads <- args[3] # max number of reads to load at once for dereplication
-  errModel <- args[4] # daad2-provided function to estimate the error model
+  errModel <- args[4] # dada2-provided function to estimate the error model
   maxBases <- args[5] # max number of bases to use for error model inference
   removeSingletons <- args[6] # "T" or "F", whether to remove singletons during denoising or not
   maxraref <- args[7] # maximum number of reads to extrapolate rarefaction curves
@@ -44,7 +44,7 @@ if (length(args) != 9){
 # input.reads <- "/Volumes/gr_Engel/mgarcia/SAGE_tuto_16S_FM_2024/1_Results/preprocessing/trimmed_filtered_reads"
 # input.readcounts <- "/Volumes/gr_Engel/mgarcia/SAGE_tuto_16S_FM_2024/1_Results/preprocessing/read_count_before_after.tsv"
 # maxReads <- 1E6
-# errModel <- binnedQualErrfun
+# errModel <- "binnedQualErrfun"
 # maxBases <- 1E10
 # removeSingletons <- "F"
 # maxraref <- 5000
@@ -86,7 +86,7 @@ print("Building error model")
 set.seed(42)
 error_model <- learnErrors(
   dereps,
-  errorEstimationFunction=errModel,
+  errorEstimationFunction = get(errModel),
   nbases = maxBases,
   randomize = T,
   BAND_SIZE = 32,
