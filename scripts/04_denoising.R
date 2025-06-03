@@ -28,12 +28,12 @@ if(!require(iNEXT)){
 args <- commandArgs(trailingOnly = TRUE)
 
 if (length(args) != 9){
-  stop(" Usage: 02_denoising.R <processed_reads_dir> <read_count_table> <max_reads_derep> <error_model> <max_bases_errormodel> <removeSingletons_T_F> <max_reads_raref> <denoise_results_dir> <plots_dir>", call.=FALSE)
+  stop(" Usage: 04_denoising.R <processed_reads_dir> <read_count_table> <max_reads_derep> <error_model> <max_bases_errormodel> <removeSingletons_T_F> <max_reads_raref> <denoise_results_dir> <plots_dir>", call.=FALSE)
 } else {
   input.reads <- args[1] # folder with all pre-processed reads
   input.readcounts <- args[2] # table reporting the number of reads at each step
   maxReads <- args[3] # max number of reads to load at once for dereplication
-  errModel <- args[4]
+  errModel <- args[4] # daad2-provided function to estimate the error model
   maxBases <- args[5] # max number of bases to use for error model inference
   removeSingletons <- args[6] # "T" or "F", whether to remove singletons during denoising or not
   maxraref <- args[7] # maximum number of reads to extrapolate rarefaction curves
@@ -98,7 +98,7 @@ saveRDS(error_model, file.path(out.denois, "dada2_error_model.RDS"))
 
 err.plot <- plotErrors(error_model, nominalQ=TRUE)
 
-ggsave(file.path(out.plots, "02_error_plot.pdf"), err.plot, device="pdf", width = 10, height = 8)
+ggsave(file.path(out.plots, "04_error_plot.pdf"), err.plot, device="pdf", width = 10, height = 8)
 
 print("Error model built")
 
@@ -245,8 +245,8 @@ qd.plot <- ggplot(
     legend.background = element_rect(fill=alpha('white', 0.4))
   )
 
-ggsave(file.path(out.plots, "02_sampling_coverage.pdf"), sc.plot, device="pdf", width = 8, height = 6)
-ggsave(file.path(out.plots, "02_rarefaction_curves.pdf"), qd.plot, device="pdf", width = 10, height = 8)
+ggsave(file.path(out.plots, "04_sampling_coverage.pdf"), sc.plot, device="pdf", width = 8, height = 6)
+ggsave(file.path(out.plots, "04_rarefaction_curves.pdf"), qd.plot, device="pdf", width = 10, height = 8)
 
 write.table(
   inextqd,
@@ -336,8 +336,8 @@ reads.plot2 <- ggplot(
   ) +
   facet_wrap(vars(stage), nrow = length(unique(reads_df2$stage)), scales = "free_y")
 
-ggsave(file.path(out.plots, "02_read_number_lines.pdf"), reads.plot1, device="pdf", width = 10, height = 8)
-ggsave(file.path(out.plots, "02_read_number_hist.pdf"), reads.plot2, device="pdf", width = 4, height = 8)
+ggsave(file.path(out.plots, "04_read_number_lines.pdf"), reads.plot1, device="pdf", width = 10, height = 8)
+ggsave(file.path(out.plots, "04_read_number_hist.pdf"), reads.plot2, device="pdf", width = 4, height = 8)
 
 
 print("Finished plotting global statistics")

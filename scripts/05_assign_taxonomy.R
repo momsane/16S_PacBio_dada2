@@ -59,26 +59,29 @@ if(!require(ggnested)){
 args <- commandArgs(trailingOnly = TRUE)
 
 if (length(args) != 8){
-  stop(" Usage: 03_assign_taxonomy.R <ASV_table> <metadata_table.tsv> <db_tax> <db_species> <rarefy_to> <facet_var> <tax_results_dir> <plots_dir>", call.=FALSE)
+  stop(" Usage: 05_assign_taxonomy.R <ASV_table> <metadata_table.tsv> <db_tax> <db_species> <rarefy_to> <facet_var> <tax_results_dir> <plots_dir>", call.=FALSE)
 } else {
   input.asvs <- args[1] # ASV table (no chimera)
   input.metadata <- args[2] # sample metadata table, tab-separated, first column is the the sample name
   db1 <- args[3] # taxonomy database for assignTaxonomy (GreenGenes2, SILVA, or custom)
   db2 <- args[4] # taxonomy database for addSpecies (SILVA or custom), put "" if not needed
   rarefy_to <- args[5] # number of reads to rarefy to; if equals -1, no rarefaction
-  facet_var <- args[6] # a column in the metadata table to facet the taxonomy plot, put "" if not needed
+  facet_var <- args[6] # one column in the metadata table to facet the taxonomy plot, put "" if not needed
   out.tax <- args[7] # folder to write denoising results
   out.plots <- args[8] # folder to write plots
 }
 
-# input.asvs <- "/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/results/denoising/ASV_samples_table_noChim.rds"
-# input.metadata <- "/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/workflow/config/metadata.tsv"
-# db1 <- "/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/data/databases/syncom_custom_db_toSpecies_trainset.fa"
-# db2 <- "/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/data/databases/syncom_custom_db_addSpecies.fa"
+# root <- "/Volumes/D2c/mgarcia/20240708_mgarcia_syncom_invivo/exp01_inoculation_methods/pacbio_analysis"
+# # root <- "/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis"
+# input.asvs <- file.path(root, "results", "denoising", "ASV_samples_table_noChim.rds")
+# input.metadata <- file.path(root, "workflow", "config", "metadata.tsv")
+# db1 <- file.path(root, "data", "databases", "syncom_custom_db_toSpecies_trainset.fa")
+# db2 <- file.path(root, "data", "databases", "syncom_custom_db_addSpecies.fa")
+# clusters_tax <- file.path(root, "workflow", "config", "all_16S_cd-hit_clusters_tax_full.tsv")
 # rarefy_to <- -1
 # facet_var <- "SampleType"
-# out.tax <- "/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/results/assign_taxonomy"
-# out.plots <- "/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/plots"
+# out.tax <- file.path(root, "results", "assign_taxonomy")
+# out.plots <- file.path(root, "plots")
 
 ### Create outdirs ###
 
@@ -94,6 +97,8 @@ rarefy_to <- as.numeric(rarefy_to)
 ASV_samples_table_noChim <- readRDS(input.asvs)
 meta <- read.table(input.metadata, sep = "\t", header = T)
 rownames(meta) = meta[ ,1]
+
+clusters <- read.table(clusters_tax, sep = "\t", header = T)
 
 ### Rarefy reads if needed ###
 
@@ -162,7 +167,7 @@ addSpecies_custom <- function(seqs, refFasta) {
     
     if (any(matched)) {
       matched_descriptions <- ref_descriptions[matched]
-      if (length(ref_matches) > 1){
+      if (length(matched_descriptions) > 1){
         print(paste0("Found more than one match for ASV ", asv_name, "; not adding it to the results"))
       } else {
         temp_df <- data.frame(ASV = asv,
@@ -353,11 +358,10 @@ tax_plot <- plot_nested_bar(ps_obj = top_nested$ps_obj,
     ) + 
   guides(fill=guide_legend(ncol =1))
 
-if (facet_vars[1] != ""){
-  tax_plot <- tax_plot + facet_wrap(formula(paste0("~ ", paste(facet_vars, collapse = "+"))), drop=T, scales = "free")
+if (facet_var[1] != ""){
+  tax_plot <- tax_plot + facet_wrap(formula(paste0("~ ", paste(facet_var, collapse = "+"))), drop=T, scales = "free")
 }
 
-ggsave(file.path(out.plots, "03_taxonomy_barplot.pdf"), tax_plot, device="pdf", width = 8, height = 6)
+ggsave(file.path(out.plots, "05_taxonomy_barplot.pdf"), tax_plot, device="pdf", width = 8, height = 6)
 
 print("Taxonomy assignment done")
-

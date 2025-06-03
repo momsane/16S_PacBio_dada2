@@ -38,7 +38,7 @@ if(!require(dada2)){
 args <- commandArgs(trailingOnly = TRUE)
 
 if (length(args) != 7){
-  stop(" Usage: 01_preprocessing.R <raw_reads_dir> <fwd_primer_sequence> <rev_primer_sequence> <min_read_length> <max_read_length> <preproc_results_dir> <plots_dir>", call.=FALSE)
+  stop(" Usage: 02_preprocessing.R <raw_reads_dir> <fwd_primer_sequence> <rev_primer_sequence> <min_read_length> <max_read_length> <preproc_results_dir> <plots_dir>", call.=FALSE)
 } else {
   input.raw <- args[1] # folder with all raw read files (if you have pre-rarefied the reads, give the folder with the pre-rarefied fastq files)
   fwd.primer <- args[2] # forward primer sequence
@@ -241,7 +241,7 @@ qc_afbf <- grid.arrange(length.plot, ns.plot, ncol=2)
 print("Saving plots and tables")
 
 # save plot
-ggsave(file.path(out.plots, "01_read_stats_before_after.pdf"), qc_afbf, device="pdf", width = 8, height = 8)
+ggsave(file.path(out.plots, "02_read_stats_before_after.pdf"), qc_afbf, device="pdf", width = 8, height = 8)
 
 # save stats
 write.table(lens_df, file.path(out.preproc, "read_length_before_after.tsv"), sep = "\t", col.names = T, row.names = F, quote = F)
