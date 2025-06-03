@@ -28,7 +28,8 @@ The pipeline consists of a few main steps:
 - pre-processing of the reads with dada2 (primer removal, length and quality trimming) `02_preprocessing.sh`
 - quality check on the processed reads `03_fastqc_postproc.sh` and `03_multiqc_posteproc.sh`
 - denoising into ASVs with dada2 `04_denoising.sh`
-- taxonmy assignment with dada2 `05_assign_taxonomy.sh`.
+- taxonmy assignment with dada2 `05_assign_taxonomy.sh`
+- *(only for defined communities)* compute strain abundance from ASV table `06_quantify_strains.sh`.
 dada2 is implemented in Rscripts called by the bash scripts. **There should not be any need to modify the R scripts**.
 
 ### Requirements
@@ -106,8 +107,10 @@ To run each script:
 | `01_multiqc_preproc.sh` & `03_multiqc_postproc.sh`            | Look at HTML report                  |
 | `02_slurm_preprocessing.sh`            | Check for errors in log; check number of fastQ files in results/preprocessing/primerfree_reads & results/preprocessing/trimmed_filtered_reads; check output plot                  |
 | `04_slurm_denoising.sh`            | Check for errors in log; check output plots                  |
+| `05_assign_taxonomy.sh`            | Check for errors in log; check output plots                  |
+| `06_quantify_strains.sh`            | Check for errors in log; check output plots                  |
 
-
+**To run `06_quantify_strains.sh`, you first need to create your custom database (see below) and run `05_assign_taxonomy.sh` with your database as `db2`.**
 
 ---
 
@@ -192,10 +195,10 @@ seqkit seq compare_gg2_custom_toGenus > syncom_custom_db_toGenus_trainset.fa
 cat syncom_custom_db_toGenus.fa >> syncom_custom_db_toGenus_trainset.fa
 ```
 
-You are now ready to use the custom databases with dada2. Keep `all_16S_cd-hit_clusters_tax_full.tsv` to analyze the results from dada2. I personally like to use the `toSpecies_trainset` with `assignTaxonomy()`, but you can instead use the `toGenus_trainset` with this function to limit memory usage if you are not interested in the species classification of 'contaminants'.
+You are now ready to use the custom databases with dada2. You will also `all_16S_cd-hit_clusters_tax_full.tsv` to run the strain quantification script. I personally like to use the `toSpecies_trainset` with `assignTaxonomy()`, but you can instead use the `toGenus_trainset` with this function to limit memory usage if you are not interested in the species classification of 'contaminants'.
 
 ---
 
 ## Authors
 
-This pipeline was written by Meline Garcia. Many thanks to [Malick N`Diaye](https://github.com/MalickNdiye) for his suggestions.
+This pipeline was written by Meline Garcia. Many thanks to [Malick N`Diaye](https://github.com/MalickNdiye) and [Aiswarya Prasad](https://github.com/Aiswarya-prasad) for their suggestions.
