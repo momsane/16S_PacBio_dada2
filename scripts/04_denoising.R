@@ -84,15 +84,20 @@ print("Dereplication done")
 print("Building error model")
 
 set.seed(42)
-error_model <- learnErrors(
-  dereps,
-  errorEstimationFunction = get(errModel),
-  nbases = maxBases,
-  randomize = T,
-  BAND_SIZE = 32,
-  multithread = T,
-  verbose = T
+
+if (errModel == "binnedQualErrfun"){
+  stop("Sorry, using binnedQualErrfun is not implemented yet")
+} else {
+  error_model <- learnErrors(
+    dereps,
+    errorEstimationFunction = get(errModel),
+    nbases = maxBases,
+    randomize = T,
+    BAND_SIZE = 32,
+    multithread = T,
+    verbose = T
   )
+}
 
 saveRDS(error_model, file.path(out.denois, "dada2_error_model.RDS"))
 
