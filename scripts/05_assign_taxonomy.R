@@ -11,10 +11,10 @@ if(!require(ggplot2)){
 }
 
 if(!require(dada2)){
-  if (!requireNamespace("BiocManager", quietly = TRUE)){
-    install.packages("BiocManager")
+  if(!require(devtools)){
+    install.packages("devtools")
   }
-  BiocManager::install("dada2")
+  devtools::install_github("benjjneb/dada2") # installing through GitHub to get latest updates
   library(dada2)
 }
 
@@ -58,17 +58,18 @@ if(!require(ggnested)){
 
 args <- commandArgs(trailingOnly = TRUE)
 
-if (length(args) != 8){
-  stop(" Usage: 05_assign_taxonomy.R <ASV_table> <metadata_table.tsv> <db_tax> <db_species> <rarefy_to> <facet_var> <tax_results_dir> <plots_dir>", call.=FALSE)
+if (length(args) != 9){
+  stop(" Usage: 05_assign_taxonomy.R <ASV_table> <metadata_table.tsv> <db_tax> <db_species> <clusters_tax> <rarefy_to> <facet_var> <tax_results_dir> <plots_dir>", call.=FALSE)
 } else {
   input.asvs <- args[1] # ASV table (no chimera)
   input.metadata <- args[2] # sample metadata table, tab-separated, first column is the the sample name
   db1 <- args[3] # taxonomy database for assignTaxonomy (GreenGenes2, SILVA, or custom)
   db2 <- args[4] # taxonomy database for addSpecies (SILVA or custom), put "" if not needed
-  rarefy_to <- args[5] # number of reads to rarefy to; if equals -1, no rarefaction
-  facet_var <- args[6] # one column in the metadata table to facet the taxonomy plot, put "" if not needed
-  out.tax <- args[7] # folder to write denoising results
-  out.plots <- args[8] # folder to write plots
+  input.clusters <- args[5] # table of ASVs with their assigned cd-hit cluster and user-input taxonomy
+  rarefy_to <- args[6] # number of reads to rarefy to; if equals -1, no rarefaction
+  facet_var <- args[7] # one column in the metadata table to facet the taxonomy plot, put "" if not needed
+  out.tax <- args[8] # folder to write denoising results
+  out.plots <- args[9] # folder to write plots
 }
 
 # root <- "/Volumes/D2c/mgarcia/20240708_mgarcia_syncom_invivo/exp01_inoculation_methods/pacbio_analysis"
@@ -77,7 +78,7 @@ if (length(args) != 8){
 # input.metadata <- file.path(root, "workflow", "config", "metadata.tsv")
 # db1 <- file.path(root, "data", "databases", "syncom_custom_db_toSpecies_trainset.fa")
 # db2 <- file.path(root, "data", "databases", "syncom_custom_db_addSpecies.fa")
-# clusters_tax <- file.path(root, "workflow", "config", "all_16S_cd-hit_clusters_tax_full.tsv")
+# input.clusters <- file.path(root, "workflow", "config", "all_16S_cd-hit_clusters_tax_full.tsv")
 # rarefy_to <- -1
 # facet_var <- "SampleType"
 # out.tax <- file.path(root, "results", "assign_taxonomy")
@@ -98,7 +99,7 @@ ASV_samples_table_noChim <- readRDS(input.asvs)
 meta <- read.table(input.metadata, sep = "\t", header = T)
 rownames(meta) = meta[ ,1]
 
-clusters <- read.table(clusters_tax, sep = "\t", header = T)
+clusters <- read.table(input.clusters, sep = "\t", header = T)
 
 ### Rarefy reads if needed ###
 
@@ -161,8 +162,13 @@ addSpecies_custom <- function(seqs, refFasta) {
     asv <- asv_seqs[i]
     
     # match if ASV is substring of reference or reference is substring of ASV
+    # + try the rev. complement
     matched <- vapply(ref_seqs, function(ref) {
-      grepl(asv, ref, fixed = TRUE) || grepl(ref, asv, fixed = TRUE)
+      rc_ref <- rc(ref)
+      grepl(asv, ref, fixed = TRUE) ||
+      grepl(ref, asv, fixed = TRUE) ||
+      grepl(asv, rc_ref, fixed = TRUE) ||
+      grepl(ref, rc_ref, fixed = TRUE)
     }, logical(1))
     
     if (any(matched)) {
@@ -184,7 +190,6 @@ addSpecies_custom <- function(seqs, refFasta) {
 
 if (db2 != ""){
   print(paste0("Using database ", db2, " to assign species"))
-  
   ASV_taxonomy2 <- addSpecies_custom(seqs = ASV_samples_table_noChim2, refFasta = db2)
   ASV_taxonomy2 <- ASV_taxonomy2 %>% 
     separate(ref_match, into = c("Species_addSp", "Strain", "Cluster"), sep = "-", remove = T) %>% 
@@ -232,9 +237,6 @@ if (db2 != ""){
 ASV_taxonomy4 <- ASV_taxonomy3 %>% 
   mutate(ASV = rownames(ASV_taxonomy3), .before = "Kingdom")
 
-write.table(ASV_taxonomy4, file.path(out.tax, "ASV_Taxonomy_raw.tsv"), sep = "\t", quote = F, col.names = T, row.names = F)
-saveRDS(ASV_taxonomy3, file.path(out.tax, "ASV_Taxonomy.RDS"))
-
 print("Finished assigning taxonomy")
 
 
@@ -281,11 +283,24 @@ print(paste0("Found and removed ", length(which(ASV_taxonomy[,1] != "d__Bacteria
 print(paste0("Found and removed ", length(which(ASV_taxonomy[,3] == "c__Chloroplast")), " chloroplast ASV(s)"))
 print(paste0("Found and removed ", length(which(ASV_taxonomy[,5] == "f__Mitochondria")), " mitochondrial ASV(s)"))
 
-# save sequences as refseq and give new names to ASVs
-dna <- Biostrings::DNAStringSet(taxa_names(ps))
+# save sequences and give new names to ASVs
+dna <- DNAStringSet(taxa_names(ps))
 names(dna) <- taxa_names(ps)
+
 ps <- merge_phyloseq(ps, dna)
 taxa_names(ps) <- paste0("ASV", seq(ntaxa(ps)))
+
+names(dna) <- taxa_names(ps)
+
+# write as fasta
+writeXStringSet(dna, file.path(out.tax, "ASVs_dada2.fasta"))
+# write as df with taxonomy
+dna_df <- data.frame(
+  seq = dna
+  ) %>% 
+  merge(tax_table(ps), by=0) %>% 
+  dplyr::rename(ASV = Row.names)
+write.table(dna_df, file.path(out.tax, "ASV_name_tax.tsv"), sep = "\t", col.names = T, row.names = F, quote = F)
 
 saveRDS(object = ps, file = file.path(out.tax, "phyloseq_object.RDS"))
 # ps <- readRDS(file.path(out.tax, "phyloseq_object.RDS"))
@@ -337,7 +352,6 @@ print("Plotting most abundant taxa")
 
 top_nested <- nested_top_taxa(
   ps,
-  # subset_samples(ps, SampleID %in% meta$SampleID[meta$SampleType == "colonized_bee"]),
   top_tax_level = "Genus", # most abundant order
   nested_tax_level = "Species", # most abundant genera within those orders
   n_top_taxa = 8, # top 8 most abundant genera

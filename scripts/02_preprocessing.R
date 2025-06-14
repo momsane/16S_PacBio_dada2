@@ -25,11 +25,16 @@ if(!require(gridExtra)){
   library(gridExtra)
 }
 
+if(!require(data.table)){
+  install.packages(pkgs = 'data.table', repos = 'https://stat.ethz.ch/CRAN/')
+  library(data.table)
+}
+
 if(!require(dada2)){
-  if (!requireNamespace("BiocManager", quietly = TRUE)){
-    install.packages("BiocManager")
+  if(!require(devtools)){
+    install.packages("devtools")
   }
-  BiocManager::install("dada2")
+  devtools::install_github("benjjneb/dada2") # installing through GitHub to get latest updates
   library(dada2)
 }
 
@@ -37,25 +42,27 @@ if(!require(dada2)){
 
 args <- commandArgs(trailingOnly = TRUE)
 
-if (length(args) != 7){
-  stop(" Usage: 02_preprocessing.R <raw_reads_dir> <fwd_primer_sequence> <rev_primer_sequence> <min_read_length> <max_read_length> <preproc_results_dir> <plots_dir>", call.=FALSE)
+if (length(args) != 8){
+  stop(" Usage: 02_preprocessing.R <raw_reads_dir> <fwd_primer_sequence> <rev_primer_sequence> <min_read_length> <max_read_length> <maxEE> <preproc_results_dir> <plots_dir>", call.=FALSE)
 } else {
   input.raw <- args[1] # folder with all raw read files (if you have pre-rarefied the reads, give the folder with the pre-rarefied fastq files)
   fwd.primer <- args[2] # forward primer sequence
   rev.primer <- args[3] # reverse primer sequence
   minLen <- args[4] # lower bound for read length, for filterAndTrim
   maxLen <- args[5] # upper bound for read length, for filterAndTrim
-  out.preproc <- args[6] # folder to write pre-processing results
-  out.plots <- args[7] # folder to write plots (can be the same folder throughout the pipeline)
+  maxEE <- args[6] # max number of errors per read
+  out.preproc <- args[7] # folder to write pre-processing results
+  out.plots <- args[8] # folder to write plots (can be the same folder throughout the pipeline)
 }
 
-# input.raw <- "/Volumes/gr_Engel/mgarcia/SAGE_tuto_16S_FM_2024/0_Data/fastq_files"
+# input.raw <- "/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/results/prerarefied_reads"
 # fwd.primer <- "AGRGTTYGATYMTGGCTCAG"
 # rev.primer <- "RGYTACCTTGTTACGACTT"
-# minLen <- 1000
-# maxLen <- 1600
-# out.preproc <- "/Volumes/gr_Engel/mgarcia/SAGE_tuto_16S_FM_2024/1_Results/preprocessing"
-# out.plots <- "/Volumes/gr_Engel/mgarcia/SAGE_tuto_16S_FM_2024/2_Plots"
+# minLen <- 1200
+# maxLen <- 1700
+# maxEE <- 3
+# out.preproc <- "/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/results/preprocessing"
+# out.plots <- "/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/plots"
 
 ### Create outdirs ###
 
@@ -69,7 +76,7 @@ dir.create(file.path(out.preproc, "trimmed_filtered_reads"), recursive = TRUE, s
 
 minLen <- as.numeric(minLen)
 maxLen <- as.numeric(maxLen)
-  
+
 raw_reads_paths <- list.files(input.raw, full.names=TRUE)
 
 
@@ -95,11 +102,11 @@ print(paste0("Primer-free reads written to: ", file.path(out.preproc, "primerfre
 primer_removal_summary <- foreach(i = seq_along(raw_reads_paths), .packages = c("dada2"), .combine = 'rbind') %dopar% {
   print(paste0("Processing ", basename(raw_reads_paths[i])))
   res <- removePrimers(fn = raw_reads_paths[i],
-                fout = trimmed_reads_paths[i], 
-                primer.fwd = fwd.primer,
-                primer.rev = rc(rev.primer),
-                orient=TRUE,
-                verbose=TRUE) # cannot multithread with dada2
+                       fout = trimmed_reads_paths[i], 
+                       primer.fwd = fwd.primer,
+                       primer.rev = rc(rev.primer),
+                       orient=TRUE,
+                       verbose=TRUE) # cannot multithread with dada2
 }
 
 print(paste0("Mean proportion of reads removed: ", round(mean(primer_removal_summary[,"reads.out"]/primer_removal_summary[,"reads.in"]),2)))
@@ -131,7 +138,7 @@ track_filtering <- foreach(i = seq_along(trimmed_reads_paths), .packages = c("da
                 maxLen=maxLen,
                 maxN=0, # no ambiguous bases
                 rm.phix=FALSE,
-                maxEE=2, # max two expected errors per sequence, calculated from the quality score
+                maxEE=3, # max two expected errors per sequence, calculated from the quality score
                 multithread = TRUE,
                 verbose = T) 
 }
@@ -146,6 +153,30 @@ filtering_summary <- filtering_summary %>%
 
 print("Trimming and filtering reads done")
 
+# ### Experimental: collect reads that were filtered out and plot quality ###
+# 
+# dir.create(file.path(out.preproc, "reads_filtered_out"), recursive = TRUE, showWarnings = FALSE)
+# 
+# fout_reads_paths <- file.path(out.preproc, "reads_filtered_out", basename(raw_reads_paths))
+# 
+# i <- 24
+# sample <- sub(".fastq.gz", "", basename(trimmed_reads_paths[i]))
+# pf_file <- trimmed_reads_paths[i]
+# pf_reads <- ShortRead::readFastq(pf_file)
+# filt_file <- filtered_trimmed_reads_paths[i]
+# filt_reads <- ShortRead::readFastq(filt_file)
+# pf_headers <- as.character(ShortRead::id(pf_reads))
+# filt_headers <- as.character(ShortRead::id(filt_reads))
+# rm <- setdiff(pf_headers, filt_headers)
+# 
+# keep_idx <- pf_headers %in% rm
+# subset <- pf_reads[keep_idx]
+# ShortRead::writeFastq(subset, fout_reads_paths[i])
+# 
+# quals1 <- plotQualityProfile(fout_reads_paths[i])
+# quals2 <- plotQualityProfile(filtered_trimmed_reads_paths[i])
+# ggsave(file.path(out.preproc, "reads_filtered_out", paste0("quals_rm_", sample, ".pdf")), quals1, device = "pdf")
+# ggsave(file.path(out.preproc, "reads_filtered_out", paste0("quals_kept_", sample, ".pdf")), quals2, device = "pdf")
 
 ### Summary stats on number of reads and read length ###
 
@@ -153,41 +184,26 @@ print("Computing read statistics")
 
 # Read length
 
-read_length <- function(fastq){
-  my_fastq_seq <- getSequences(fastq)
-  lens <- unname(sapply(my_fastq_seq, nchar))
-  return(lens)
+compute_all_readL <- function(paths, stage){
+  list <- foreach(i = seq_along(paths), .packages = c("dada2"), .inorder = FALSE) %dopar% {
+    my_fastq_seq <- getSequences(paths[i])
+    lens <- unname(sapply(my_fastq_seq, nchar))
+    
+    data.frame(
+      basename = rep(basename(paths[i]), length(lens)),
+      read = seq_along(lens),
+      length = lens,
+      stage = stage,
+      stringsAsFactors = FALSE
+    )
+  }
+  df <- rbindlist(list)
+  return(df)
 }
 
-lens_raw_df <- foreach(i = seq_along(raw_reads_paths), .packages = c("dada2"), .combine = 'rbind', inorder = FALSE) %dopar% {
-  lens <- read_length(raw_reads_paths[i])
-  data.frame(
-    basename = rep(basename(raw_reads_paths[i]),length(lens)),
-    read = seq_along(lens),
-    length = lens,
-    stage = "Input"
-  )
-}
-
-lens_bf_df <- foreach(i = seq_along(trimmed_reads_paths), .packages = c("dada2"), .combine = 'rbind', inorder = FALSE) %dopar% {
-  lens <- read_length(trimmed_reads_paths[i])
-  data.frame(
-    basename = rep(basename(trimmed_reads_paths[i]),length(lens)),
-    read = seq_along(lens),
-    length = lens,
-    stage = "Primers removed"
-  )
-}
-
-lens_af_df <- foreach(i = seq_along(filtered_trimmed_reads_paths), .packages = c("dada2"), .combine = 'rbind', inorder = FALSE) %dopar% {
-  lens <- read_length(filtered_trimmed_reads_paths[i])
-  data.frame(
-    basename = rep(basename(filtered_trimmed_reads_paths[i]),length(lens)),
-    read = seq_along(lens),
-    length = lens,
-    stage = "Post processing"
-  )
-}
+lens_raw_df <- compute_all_readL(raw_reads_paths, "Input")
+lens_bf_df <- compute_all_readL(trimmed_reads_paths, "Primers removed")
+lens_af_df <- compute_all_readL(filtered_trimmed_reads_paths, "Post processing")
 
 lens_df <- rbind(lens_raw_df, lens_bf_df, lens_af_df) %>% arrange(basename) # combine before and after data
 lens_df$stage <- factor(lens_df$stage, levels = c("Input", "Primers removed", "Post processing"), ordered = T)

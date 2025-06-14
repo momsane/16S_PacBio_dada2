@@ -6,7 +6,7 @@
 #SBATCH --cpus-per-task 2
 #SBATCH --mem 16000
 #SBATCH --partition cpu
-#SBATCH --time 02:00:00
+#SBATCH --time 05:00:00
 #SBATCH --error /work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/logs/04_denoising.log
 #SBATCH --output /work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/logs/04_denoising.log
 
@@ -25,9 +25,8 @@ script="$root"/workflow/scripts/04_denoising.R
 processed_fastq_dir="$root"/results/preprocessing/trimmed_filtered_reads
 readcounts="$root"/results/preprocessing/read_count_before_after.tsv
 maxReads=1000000
-# errModel=binnedQualErrfun # use `binnedQualErrfun` for Kinnex data, or `PacBioErrfun` for normal PacBio data
-errModel=PacBioErrfun
-maxBases=1000000000
+errModel=binnedQualErrfun # use `binnedQualErrfun` for Revio data, or `PacBioErrfun` for Sequel data
+maxBases=10000000000 # 1E10 strongly recommended
 removeSingletons=F # option for the dada function
 maxraref=5000 # use the multiqc output to set this value close to the max number of reads in a sample
 out_denois="$root"/results/denoising

@@ -28,8 +28,9 @@ raw_fastq_dir="$root"/results/prerarefied_reads # if you pre-rarefied
 
 fwd_primer=AGRGTTYGATYMTGGCTCAG
 rev_primer=RGYTACCTTGTTACGACTT
-minLen=1000
+minLen=1400
 maxLen=1600
+maxEE=3 # use 2 for normal PacBio, 3 for Kinnex
 out_preproc="$root"/results/preprocessing
 out_plots="$root"/plots
 
@@ -41,6 +42,7 @@ echo fwd.primer: "$fwd_primer"
 echo rev.primer: "$rev_primer"
 echo minLen: "$minLen"
 echo maxLen: "$maxLen"
+echo maxEE: "$maxEE"
 echo out.preproc: "$out_preproc"
 echo out.plots: "$out_plots"
 
@@ -51,7 +53,8 @@ Rscript --vanilla "$script" \
     "$fwd_primer" \
     "$rev_primer" \
     "$minLen" \
-    "$maxLe" \
+    "$maxLen" \
+    "$maxEE" \
     "$out_preproc" \
     "$out_plots"
 

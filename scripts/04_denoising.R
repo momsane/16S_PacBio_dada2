@@ -11,10 +11,10 @@ if(!require(ggplot2)){
 }
 
 if(!require(dada2)){
-  if (!requireNamespace("BiocManager", quietly = TRUE)){
-    install.packages("BiocManager")
+  if(!require(devtools)){
+    install.packages("devtools")
   }
-  BiocManager::install("dada2")
+  devtools::install_github("benjjneb/dada2") # installing through GitHub to get latest updates
   library(dada2)
 }
 
@@ -41,15 +41,15 @@ if (length(args) != 9){
   out.plots <- args[9] # folder to write plots
 }
 
-# input.reads <- "/Volumes/gr_Engel/mgarcia/SAGE_tuto_16S_FM_2024/1_Results/preprocessing/trimmed_filtered_reads"
-# input.readcounts <- "/Volumes/gr_Engel/mgarcia/SAGE_tuto_16S_FM_2024/1_Results/preprocessing/read_count_before_after.tsv"
+# input.reads <- "/Volumes/D2c/mgarcia/20240708_mgarcia_syncom_invivo/exp01_inoculation_methods/pacbio_analysis/results/preprocessing/trimmed_filtered_reads"
+# input.readcounts <- "/Volumes/D2c/mgarcia/20240708_mgarcia_syncom_invivo/exp01_inoculation_methods/pacbio_analysis/results/preprocessing/read_count_before_after.tsv"
 # maxReads <- 1E6
-# errModel <- "binnedQualErrfun"
+# errModel <- "binnedQualErrfun" # or binnedQualErrfun
 # maxBases <- 1E10
 # removeSingletons <- "F"
 # maxraref <- 5000
-# out.denois <- "//Volumes/gr_Engel/mgarcia/SAGE_tuto_16S_FM_2024/1_Results/denoising"
-# out.plots <- "/Volumes/gr_Engel/mgarcia/SAGE_tuto_16S_FM_2024/2_Plots"
+# out.denois <- "/Volumes/D2c/mgarcia/20240708_mgarcia_syncom_invivo/exp01_inoculation_methods/pacbio_analysis/results/denoising"
+# out.plots <- "/Volumes/D2c/mgarcia/20240708_mgarcia_syncom_invivo/exp01_inoculation_methods/pacbio_analysis/plots"
 
 ### Create outdirs ###
 
@@ -66,8 +66,6 @@ maxraref <- as.numeric(maxraref)
 
 filtered_trimmed_reads_paths <- list.files(input.reads, full.names=TRUE)
 reads_df <- read.table(input.readcounts, sep = "\t", header = T)
-
-
 
 ### Dereplicate sequences ###
 
@@ -86,11 +84,23 @@ print("Building error model")
 set.seed(42)
 
 if (errModel == "binnedQualErrfun"){
-  stop("Sorry, using binnedQualErrfun is not implemented yet")
-} else {
+  print("Building error model with bins [3, 10, 17, 22, 27, 35, 40]")
+  binnedQs <- c(3, 10, 17, 22, 27, 35, 40)
+  binnedQualErrfun <- makeBinnedQualErrfun(binnedQs)
   error_model <- learnErrors(
     dereps,
-    errorEstimationFunction = get(errModel),
+    errorEstimationFunction = binnedQualErrfun,
+    nbases = maxBases,
+    randomize = T,
+    BAND_SIZE = 32,
+    multithread = T,
+    verbose = T
+  )
+} else if (errModel == "PacBioErrfun") {
+  print("Building error model with standard PacBio model")
+  error_model <- learnErrors(
+    dereps,
+    errorEstimationFunction = PacBioErrfun,
     nbases = maxBases,
     randomize = T,
     BAND_SIZE = 32,
@@ -99,11 +109,10 @@ if (errModel == "binnedQualErrfun"){
   )
 }
 
-saveRDS(error_model, file.path(out.denois, "dada2_error_model.RDS"))
-
 err.plot <- plotErrors(error_model, nominalQ=TRUE)
+ggsave(file.path(out.plots, paste0("04_error_plot_", errModel, ".pdf")), err.plot, device="pdf", width = 10, height = 8)
 
-ggsave(file.path(out.plots, "04_error_plot.pdf"), err.plot, device="pdf", width = 10, height = 8)
+saveRDS(error_model, file.path(out.denois, "dada2_error_model.RDS"))
 
 print("Error model built")
 

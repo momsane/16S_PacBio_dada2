@@ -25,11 +25,11 @@ The pipeline consists of a few main steps:
 
 - *(optional step)* pre-rarefaction of the reads for large samples `00_rarefy.sh`
 - quality check on the raw reads `01_fastqc_preproc.sh` and `01_multiqc_preproc.sh`
-- pre-processing of the reads with dada2 (primer removal, length and quality trimming) `02_preprocessing.sh`
+- pre-processing of the reads with dada2 (primer removal, length and quality trimming) `02_slurm_preprocessing.sh`
 - quality check on the processed reads `03_fastqc_postproc.sh` and `03_multiqc_posteproc.sh`
-- denoising into ASVs with dada2 `04_denoising.sh`
-- taxonmy assignment with dada2 `05_assign_taxonomy.sh`
-- *(only for defined communities)* compute strain abundance from ASV table `06_quantify_strains.sh`.
+- denoising into ASVs with dada2 `04_slurm_denoising.sh`
+- taxonmy assignment with dada2 `05_slurm_assign_taxonomy.sh`
+- *(only for defined communities)* compute strain abundance from ASV table `06_slurm_quantify_strains.sh`.
 dada2 is implemented in Rscripts called by the bash scripts. **There should not be any need to modify the R scripts**.
 
 ### Requirements
@@ -90,8 +90,9 @@ On top of this, each script requires some specific customization to match your s
 |--------------------|---------------------------------------------------|--------------------------------------------------------|
 | `fwd_primer`        | Forward primer sequence                            | `AGRGTTYGATYMTGGCTCAG`                                  |
 | `rev_primer`        | Reverse primer sequence                            | `RGYTACCTTGTTACGACTT`                                  |
-| `minLen`            | Minimum read length for filtering                  | `1000`                                                  |
+| `minLen`            | Minimum read length for filtering                  | `1400`                                                  |
 | `maxLen`            | Maximum read length for filtering                  | `1600`                                                  |
+ `maxEE`            | Maximum number of errors per read                  | `3`                                                  |
 
 ### Running the pipeline
 
@@ -107,10 +108,10 @@ To run each script:
 | `01_multiqc_preproc.sh` & `03_multiqc_postproc.sh`            | Look at HTML report                  |
 | `02_slurm_preprocessing.sh`            | Check for errors in log; check number of fastQ files in results/preprocessing/primerfree_reads & results/preprocessing/trimmed_filtered_reads; check output plot                  |
 | `04_slurm_denoising.sh`            | Check for errors in log; check output plots                  |
-| `05_assign_taxonomy.sh`            | Check for errors in log; check output plots                  |
-| `06_quantify_strains.sh`            | Check for errors in log; check output plots                  |
+| `05_slurm_assign_taxonomy.sh`            | Check for errors in log; check output plots                  |
+| `06_slurm_quantify_strains.sh`            | Check for errors in log; check output plots                  |
 
-**To run `06_quantify_strains.sh`, you first need to create your custom database (see below) and run `05_assign_taxonomy.sh` with your database as `db2`.**
+**To run `06_slurm_quantify_strains.sh`, you first need to create your custom database (see below) and run `05_slurm_assign_taxonomy.sh` with your database as `db2`.**
 
 ---
 

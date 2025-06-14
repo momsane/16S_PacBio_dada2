@@ -26,7 +26,7 @@ if (length(args) != 6){
   stop(" Usage: 06_quantify_strains.R <cd-hit_clusters_tax_full> <metadata_table.tsv> <facet_var> <quant_results_dir> <plots_dir>", call.=FALSE)
 } else {
   input.ps <- args[1] # phyloseq object resulting from 05_assign_taxonomy
-  input.clusters <- args[2] # list of ASVs with their assigned cd-hit cluster and user-input taxonomy
+  input.clusters <- args[2] # table of ASVs with their assigned cd-hit cluster and user-input taxonomy
   input.metadata <- args[3] # sample metadata table, tab-separated, first column is the the sample name
   facet_var <- args[4] # one column in the metadata table to facet the taxonomy plot, put "" if not needed
   out.quant <- args[5] # folder to write quantification results
