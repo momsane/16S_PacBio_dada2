@@ -1,8 +1,13 @@
 # Load required libraries
 
-if(!require(tidyverse)){
-  install.packages(pkgs = 'tidyverse', repos = 'https://stat.ethz.ch/CRAN/')
-  library(tidyverse)
+if(!require(dplyr)){
+  install.packages(pkgs = 'dplyr', repos = 'https://stat.ethz.ch/CRAN/')
+  library(dplyr)
+}
+
+if(!require(tidyr)){
+  install.packages(pkgs = 'tidyr', repos = 'https://stat.ethz.ch/CRAN/')
+  library(tidyr)
 }
 
 if(!require(ggplot2)){

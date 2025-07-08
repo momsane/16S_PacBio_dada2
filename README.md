@@ -11,6 +11,7 @@
         - [Adapting the scripts](#adapting-the-scripts)
         - [Running the pipeline](#running-the-pipeline)
     - [Custom database for defined communities](#creating-a-custom-database-for-defined-communities)
+        - [Install required tools](#install-required-tools)
         - [Merging and dereplicating 16S sequences](#merging-and-dereplicating-16s-sequences)
         - [Formatting databases for dada2](#formatting-databases-for-dada2)
         - [Comparing and merging databases](#comparing-and-merging-databases)
@@ -23,12 +24,13 @@
 
 The pipeline consists of a few main steps:
 
+- copy and rename raw reads files with sample ID if needed `copy_rename_files.sh`
 - *(optional step)* pre-rarefaction of the reads for large samples `00_rarefy.sh`
 - quality check on the raw reads `01_fastqc_preproc.sh` and `01_multiqc_preproc.sh`
 - pre-processing of the reads with dada2 (primer removal, length and quality trimming) `02_slurm_preprocessing.sh`
 - quality check on the processed reads `03_fastqc_postproc.sh` and `03_multiqc_posteproc.sh`
 - denoising into ASVs with dada2 `04_slurm_denoising.sh`
-- taxonmy assignment with dada2 `05_slurm_assign_taxonomy.sh`
+- taxonomy assignment with dada2 `05_slurm_assign_taxonomy.sh`
 - *(only for defined communities)* compute strain abundance from ASV table `06_slurm_quantify_strains.sh`.
 dada2 is implemented in Rscripts called by the bash scripts. **There should not be any need to modify the R scripts**.
 
@@ -42,8 +44,10 @@ dada2 is implemented in Rscripts called by the bash scripts. **There should not 
 
 #### Structure
 
-First, you will create a working directory with the following structure:
-
+Set up your working directory:
+1. Create a folder with the name of your project.
+2. Enter this folder, clone this git using `git clone https://github.com/momsane/16S_PacBio_dada2` then rename the folder `mv 16S_PacBio_dada2 workflow`.
+3. Create additional folders to obtain the following tree:
 ```
 .
 ├── data
@@ -51,7 +55,7 @@ First, you will create a working directory with the following structure:
 ├── logs
 ├── plots
 ├── results
-└── workflow <- this folder is downloaded with git clone https://github.com/momsane/16S_PacBio_dada2
+└── workflow <- git clone https://github.com/momsane/16S_PacBio_dada2
     ├── config
     ├── envs
     └── scripts
@@ -61,16 +65,16 @@ First, you will create a working directory with the following structure:
 
 You'll need access to a conda installation on your cluster. You can either have yours, installed for instance through miniforge3, or use the one provided by the cluster. This will change slightly how you activate environments at the beginning of the scripts. To use the cluster conda, follow the instructions [here](https://wiki.unil.ch/ci/books/high-performance-computing-hpc/page/using-conda-and-anaconda). To use your own conda installation, you just need to modify the `$CONDA_HOME` variable in the scripts.
 
-Install the required conda environments using the .yaml files located in envs with the command `conda env create -f envs/<env>.yaml`.
+Install all the required conda environments using the .yaml files located in the *envs* folder with the command `conda env create -f envs/<env>.yaml`.
 
 ### Data Preparation
 
-Before running the pipeline, you need to prepare your data:
+Before running the pipeline, you need to prepare some data:
 
-1.  **Metadata file:** modify `config/metadata.tsv` according to your samples. You do not need to keep the same columns except for the first one. This first column must contain the sample names (filenames without the `.fastq.gz` extension).
-2.  **File naming Table:** the raw read files you got from the sequencing facility have long non-informative names. You will rename them with the SampleID. Create a table like `config/rename_files.tsv` where the first column is the current name of each file, and the second column is the new name. This table has no header. It is important that this table be in Unix format. If you modify it in excel for instance, it will not be in Unix format. You can use the command-line tool dos2unix to convert it. Make sure there is a line return after the last line in the table.
-3.  **Read rarefaction table (optional):** if you have very uneven depth in your dataset with very large samples, you might want to consider rarefying the raw reads to limit unnecessary computation time and resources. Modify `config/pre_rarefaction.tsv` according to your samples. As with `config/rename_files.tsv`, make sure it is in Unix format. If you do not want to rarefy your reads, skip this step.
-4.  **Raw reads:** you are now ready to copy them from the nas. Modify the script `copy_rename_files.sh` with the correct paths. Then execute it from the login node (i.e. use `bash` instead of `sbatch` to submit it), because the NAS can only be accessed from the login node.
+1.  **File naming Table:** the raw read files you got from the sequencing facility have long non-informative names. If not done already, you will rename them with the SampleID. Create a table like `config/rename_files.tsv` where the first column is the current name of each file, and the second column is the new name. This table has no header. It is important that this table be in Unix format. If you modify it in Excel for instance, it will not be in Unix format. You can use the command-line tool dos2unix to convert it. Make sure there is a line return after the last line in the table.
+2.  **Metadata file:** modify `config/metadata.tsv` according to your samples. You do not need to keep the same columns except for the first one. This first column must contain the sample names (filenames without the `.fastq.gz` extension).
+3.  **Read rarefaction table (optional):** if you have very uneven depth in your dataset, you might want to consider rarefying the raw reads to limit unnecessary computation time and resources for large samples. Modify `config/pre_rarefaction.tsv` according to your needs. For bee gut samples, 20,000 reads is way more than enough. As with `config/rename_files.tsv`, make sure it is in Unix format.
+4.  **Raw reads:** you are now ready to copy them from the NAS. Modify the script `copy_rename_files.sh` with the correct paths. Then execute it from the login node (i.e. use `bash` instead of `sbatch` to submit it).
 
 ### Adapting the scripts
 
@@ -81,18 +85,7 @@ Only the `.sh` scripts need to be modified. You will need to modify the beginnin
 - the fastQC scripts are array jobs (argument `--array` in the slurm header), so you need to modify the range of the arrays. `2-50` means you will process files described in lines 2 to 50 of `config/metadata.tsv`. We start at 2 to skip the header. So your array range should be `2-<number of samples>+1`
 - you should not need to modify the resource requirements, unless your jobs get killed.
 
-On top of this, each script requires some specific customization to match your specific data:
-
-- `01_fastqc_preproc.sh` and `02_slurm_preprocessing.sh`: depending on whether you rarefied your raw reads or not, modify the `reads` variable
-- `02_preprocessing.sh` for example:
-
-| Variable           | Description                                       | Default Value                                          |
-|--------------------|---------------------------------------------------|--------------------------------------------------------|
-| `fwd_primer`        | Forward primer sequence                            | `AGRGTTYGATYMTGGCTCAG`                                  |
-| `rev_primer`        | Reverse primer sequence                            | `RGYTACCTTGTTACGACTT`                                  |
-| `minLen`            | Minimum read length for filtering                  | `1400`                                                  |
-| `maxLen`            | Maximum read length for filtering                  | `1600`                                                  |
- `maxEE`            | Maximum number of errors per read                  | `3`                                                  |
+On top of this, each script requires customization of some script-specific variables. For instance, in `01_fastqc_preproc.sh` and `02_slurm_preprocessing.sh` you must modify the `reads` variable, depending on whether you did the pre-rarefaction step.
 
 ### Running the pipeline
 
@@ -111,23 +104,26 @@ To run each script:
 | `05_slurm_assign_taxonomy.sh`            | Check for errors in log; check output plots                  |
 | `06_slurm_quantify_strains.sh`            | Check for errors in log; check output plots                  |
 
-**To run `06_slurm_quantify_strains.sh`, you first need to create your custom database (see below) and run `05_slurm_assign_taxonomy.sh` with your database as `db2`.**
+**To run `06_slurm_quantify_strains.sh`, you first need to create your custom database (see below) and run `05_slurm_assign_taxonomy.sh` with this custom database as `db2`.**
 
 ---
 
 
 ## Creating a custom database for defined communities
 
-This can be done entirely on your local computer. Create a conda environment containing `seqkit`, `cd-hit` and `dos2unix`.
-It is highly recommended to use 16S sequences from PacBio sequencing (WGS or amplicon) because 16S inference with Illumina or ONT genomes can be inaccurate.
+This can be done entirely on your local computer. It is highly recommended to use 16S sequences from PacBio sequencing (WGS or amplicon) because 16S inference with Illumina or ONT genomes can be inaccurate.
+
+### Install required tools
+
+Create the following conda environment: `conda create custom_db_dada2 bioconda::seqkit bioconda::cd-hit conda-forge::dos2unix`.
 
 ### Merging and dereplicating 16S sequences
 
-1. Put all 16S sequences in a single folder called `individual_16S`. Each sequence must have a unique ID that contains the strain name.
+1. Put all 16S sequences in a single folder called `individual_16S`. **Each sequence must have a unique ID containing the strain name.**
 
-2. Concatenate the sequences using `cat individual_16S/*.fna >> all_16S.fna`.
+2. Concatenate the sequences: `cat individual_16S/*.fna >> all_16S.fna`.
 
-3. Run **cd-hit-est** with 100% identity threshold: `cd-hit-est -i all_16S.fna -o all_16S_cd-hit -c 1 -n 10 -d 0`.
+3. Run `cd-hit-est` with 100% identity threshold: `cd-hit-est -i all_16S.fna -o all_16S_cd-hit -c 1 -n 10 -d 0`.
 
 4. Parse the `.clstr` output into a table:
 ```
@@ -148,9 +144,9 @@ BEGIN { print "cluster\tsequence"}
 ' all_16S_cd-hit.clstr > all_16S_cd-hit_clusters.tsv
 ```
 
-5. Open `all_16S_cd-hit_clusters.tsv` in excel or a text editor and check that each cluster contains only sequences from the same strain. If it is not the case, this is fine. You will just need to keep in mind later that some ASVs cannot be used to quantify the abundance of your strains.
+5. Open `all_16S_cd-hit_clusters.tsv` in Excel or a text editor and check that each cluster contains only sequences from the same strain. If it is not the case, this is fine. You will just need to keep in mind later that some ASVs cannot be used to quantify the abundance of your strains.
 
-You are now in possession of a dereplicated database of all the 16S amplicons of your community. But we still need to **(1)** generate versions of this database with correctly formatted headers **(2)** merge these new versions with existing toSpecies and toGenus databases to use with `assignTaxonomy()` **(3)** generate a version of this database with only the species name to use with `addSpecies()`.
+You are now in possession of a dereplicated database of all the 16S amplicons of your community. But we still need to **(1)** generate versions of this database with correctly formatted headers for dada2 **(2)** merge these new versions with existing databases to use with `assignTaxonomy()` **(3)** generate a version of this database with only the species name to use with `addSpecies()`.
 
 ### Formatting databases for dada2
 

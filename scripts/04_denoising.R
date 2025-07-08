@@ -1,8 +1,13 @@
 # Load required libraries
 
-if(!require(tidyverse)){
-  install.packages(pkgs = 'tidyverse', repos = 'https://stat.ethz.ch/CRAN/')
-  library(tidyverse)
+if(!require(dplyr)){
+  install.packages(pkgs = 'dplyr', repos = 'https://stat.ethz.ch/CRAN/')
+  library(dplyr)
+}
+
+if(!require(tidyr)){
+  install.packages(pkgs = 'tidyr', repos = 'https://stat.ethz.ch/CRAN/')
+  library(tidyr)
 }
 
 if(!require(ggplot2)){
@@ -12,7 +17,7 @@ if(!require(ggplot2)){
 
 if(!require(dada2)){
   if(!require(devtools)){
-    install.packages("devtools")
+    install.packages(pkgs = 'devtools', repos = 'https://stat.ethz.ch/CRAN/')
   }
   devtools::install_github("benjjneb/dada2") # installing through GitHub to get latest updates
   library(dada2)

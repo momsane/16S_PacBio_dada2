@@ -10,9 +10,14 @@ if(!require(doParallel)){
   library(doParallel)
 }
 
-if(!require(tidyverse)){
-  install.packages(pkgs = 'tidyverse', repos = 'https://stat.ethz.ch/CRAN/')
-  library(tidyverse)
+if(!require(dplyr)){
+  install.packages(pkgs = 'dplyr', repos = 'https://stat.ethz.ch/CRAN/')
+  library(dplyr)
+}
+
+if(!require(tidyr)){
+  install.packages(pkgs = 'tidyr', repos = 'https://stat.ethz.ch/CRAN/')
+  library(tidyr)
 }
 
 if(!require(ggplot2)){
@@ -32,7 +37,7 @@ if(!require(data.table)){
 
 if(!require(dada2)){
   if(!require(devtools)){
-    install.packages("devtools")
+    install.packages(pkgs = 'devtools', repos = 'https://stat.ethz.ch/CRAN/')
   }
   devtools::install_github("benjjneb/dada2") # installing through GitHub to get latest updates
   library(dada2)
@@ -109,7 +114,7 @@ primer_removal_summary <- foreach(i = seq_along(raw_reads_paths), .packages = c(
                        verbose=TRUE) # cannot multithread with dada2
 }
 
-print(paste0("Mean proportion of reads removed: ", round(mean(primer_removal_summary[,"reads.out"]/primer_removal_summary[,"reads.in"]),2)))
+print(paste0("Mean proportion of reads removed: ", round(mean(1-primer_removal_summary[,"reads.out"]/primer_removal_summary[,"reads.in"]),2)))
 
 saveRDS(primer_removal_summary, file.path(out.preproc, "primer_removal_summary.rds"))
 # primer_removal_summary <- readRDS(file.path(out.preproc, "primer_removal_summary.rds"))
