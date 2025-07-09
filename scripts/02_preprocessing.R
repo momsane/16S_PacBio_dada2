@@ -20,6 +20,11 @@ if(!require(tidyr)){
   library(tidyr)
 }
 
+if(!require(stringr)){
+  install.packages(pkgs = 'stringr', repos = 'https://stat.ethz.ch/CRAN/')
+  library(stringr)
+}
+
 if(!require(ggplot2)){
   install.packages(pkgs = 'ggplot2', repos = 'https://stat.ethz.ch/CRAN/')
   library(ggplot2)
@@ -71,7 +76,7 @@ if (length(args) != 8){
 
 ### Create outdirs ###
 
-print("Creating directories")
+cat("\nCreating directories\n")
 
 dir.create(out.plots, recursive = TRUE, showWarnings = FALSE)
 dir.create(file.path(out.preproc, "primerfree_reads"), recursive = TRUE, showWarnings = FALSE)
@@ -96,16 +101,16 @@ registerDoParallel(cl)
 
 ### Orient sequences and trim primers ###
 
-print("Orienting sequences and trimming primers")
+cat("Orienting sequences and trimming primers\n")
 
 # Define paths for primers-free reads
 trimmed_reads_paths <- file.path(out.preproc, "primerfree_reads", basename(raw_reads_paths))
 
-print(paste0("Primer-free reads written to: ", file.path(out.preproc, "primerfree_reads")))
+cat(paste0("Primer-free reads written to: ", file.path(out.preproc, "primerfree_reads"), "\n"))
 
 
 primer_removal_summary <- foreach(i = seq_along(raw_reads_paths), .packages = c("dada2"), .combine = 'rbind') %dopar% {
-  print(paste0("Processing ", basename(raw_reads_paths[i])))
+  cat(paste0("Processing ", basename(raw_reads_paths[i]), "\n"))
   res <- removePrimers(fn = raw_reads_paths[i],
                        fout = trimmed_reads_paths[i], 
                        primer.fwd = fwd.primer,
@@ -114,7 +119,7 @@ primer_removal_summary <- foreach(i = seq_along(raw_reads_paths), .packages = c(
                        verbose=TRUE) # cannot multithread with dada2
 }
 
-print(paste0("Mean proportion of reads removed: ", round(mean(1-primer_removal_summary[,"reads.out"]/primer_removal_summary[,"reads.in"]),2)))
+cat(paste0("Mean proportion of reads removed: ", round(mean(1-primer_removal_summary[,"reads.out"]/primer_removal_summary[,"reads.in"]),2),"\n"))
 
 saveRDS(primer_removal_summary, file.path(out.preproc, "primer_removal_summary.rds"))
 # primer_removal_summary <- readRDS(file.path(out.preproc, "primer_removal_summary.rds"))
@@ -125,13 +130,13 @@ primers_summary <- primers_summary %>%
   pivot_longer(c("reads.in", "reads.out"), values_to = "n_reads", names_to = "stage") %>%
   mutate(stage = ifelse(stage == "reads.in", "Input", "Primers removed"))
 
-print("Orientation and primer removal done")
+cat("Orientation and primer removal done\n")
 
 
 
 ### Trim and filter reads based on quality and length ###
 
-print("Trimming and filtering reads")
+cat("Trimming and filtering reads\n")
 
 # Define paths for trimmed and filtered reads
 filtered_trimmed_reads_paths <- file.path(out.preproc, "trimmed_filtered_reads", basename(trimmed_reads_paths))
@@ -148,7 +153,7 @@ track_filtering <- foreach(i = seq_along(trimmed_reads_paths), .packages = c("da
                 verbose = T) 
 }
 
-print(paste0("Mean proportion of reads removed: ", round(mean(track_filtering[,"reads.out"]/track_filtering[,"reads.in"]),2)))
+cat(paste0("Mean proportion of reads removed: ", round(mean(track_filtering[,"reads.out"]/track_filtering[,"reads.in"]),2), "\n"))
 
 filtering_summary <- as.data.frame(track_filtering)
 filtering_summary <- filtering_summary %>%
@@ -156,7 +161,7 @@ filtering_summary <- filtering_summary %>%
   pivot_longer(c("reads.in", "reads.out"), values_to = "n_reads", names_to = "stage") %>%
   mutate(stage = ifelse(stage == "reads.in", "Primers removed", "Post processing"))
 
-print("Trimming and filtering reads done")
+cat("Trimming and filtering reads done\n")
 
 # ### Experimental: collect reads that were filtered out and plot quality ###
 # 
@@ -185,7 +190,7 @@ print("Trimming and filtering reads done")
 
 ### Summary stats on number of reads and read length ###
 
-print("Computing read statistics")
+cat("Computing read statistics\n")
 
 # Read length
 
@@ -259,7 +264,7 @@ ns.plot <- ggplot(
 
 qc_afbf <- grid.arrange(length.plot, ns.plot, ncol=2)
 
-print("Saving plots and tables")
+cat("Saving plots and tables\n")
 
 # save plot
 ggsave(file.path(out.plots, "02_read_stats_before_after.pdf"), qc_afbf, device="pdf", width = 8, height = 8)
@@ -269,7 +274,7 @@ write.table(lens_df, file.path(out.preproc, "read_length_before_after.tsv"), sep
 write.table(reads_df, file.path(out.preproc, "read_count_before_after.tsv"), sep = "\t", col.names = T, row.names = F, quote = F)
 
 
-print("All pre-processing done")
+cat("All pre-processing done\n")
 
 ### Stop cluster ###
 stopCluster(cl)

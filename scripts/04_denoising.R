@@ -10,6 +10,11 @@ if(!require(tidyr)){
   library(tidyr)
 }
 
+if(!require(stringr)){
+  install.packages(pkgs = 'stringr', repos = 'https://stat.ethz.ch/CRAN/')
+  library(stringr)
+}
+
 if(!require(ggplot2)){
   install.packages(pkgs = 'ggplot2', repos = 'https://stat.ethz.ch/CRAN/')
   library(ggplot2)
@@ -58,7 +63,7 @@ if (length(args) != 9){
 
 ### Create outdirs ###
 
-print("Creating directories")
+cat("\nCreating directories\n")
 
 dir.create(out.plots, recursive = TRUE, showWarnings = FALSE)
 dir.create(out.denois, recursive = TRUE, showWarnings = FALSE)
@@ -74,22 +79,22 @@ reads_df <- read.table(input.readcounts, sep = "\t", header = T)
 
 ### Dereplicate sequences ###
 
-print("Dereplicating sequences")
+cat("Dereplicating sequences\n")
 
 dereps <- derepFastq(filtered_trimmed_reads_paths, verbose=TRUE, n = maxReads)
 
-print("Dereplication done")
+cat("Dereplication done\n")
 
 
 
 ### Build error model ###
 
-print("Building error model")
+cat("Building error model\n")
 
 set.seed(42)
 
 if (errModel == "binnedQualErrfun"){
-  print("Building error model with bins [3, 10, 17, 22, 27, 35, 40]")
+  cat("Building error model with bins [3, 10, 17, 22, 27, 35, 40]\n")
   binnedQs <- c(3, 10, 17, 22, 27, 35, 40)
   binnedQualErrfun <- makeBinnedQualErrfun(binnedQs)
   error_model <- learnErrors(
@@ -102,7 +107,7 @@ if (errModel == "binnedQualErrfun"){
     verbose = T
   )
 } else if (errModel == "PacBioErrfun") {
-  print("Building error model with standard PacBio model")
+  cat("Building error model with standard PacBio model\n")
   error_model <- learnErrors(
     dereps,
     errorEstimationFunction = PacBioErrfun,
@@ -119,50 +124,50 @@ ggsave(file.path(out.plots, paste0("04_error_plot_", errModel, ".pdf")), err.plo
 
 saveRDS(error_model, file.path(out.denois, "dada2_error_model.RDS"))
 
-print("Error model built")
+cat("Error model built\n")
 
 
 ### ASV inference ###
 
-print("Denoising into ASVs")
+cat("Denoising into ASVs\n")
 
 dds <- list()
 
 if (removeSingletons == "F"){
-  print("Singleton detection OFF")
+  cat("Singleton detection OFF\n")
   for(i in seq_along(dereps)) {
     file = names(dereps)[i]
-    print(paste0("Processing:", file))
+    cat(paste0("Processing:", file, "\n"))
     dds[[file]] <- dada(dereps[i], err=error_model, DETECT_SINGLETONS=FALSE, multithread=TRUE, verbose = T) # may leave singletons after merging
   }
 }
 
 if (removeSingletons == "T"){
-  print("Singleton detection ON")
+  cat("Singleton detection ON\n")
   for(i in seq_along(dereps)) {
     file = names(dereps)[i]
-    print(paste0("Processing:", file))
+    cat(paste0("Processing:", file, "\n"))
     dds[[file]] <- dada(dereps[i], err=error_model, DETECT_SINGLETONS=TRUE, multithread=TRUE, verbose = T) # removes any singletons
   }
 }
 
 saveRDS(dds, file.path(out.denois, "denoised_seqs.rds"))
 
-print("Denoising done")
+cat("Denoising done\n")
 
 
 ### Generate ASV table ###
 
-print("Generating ASV table")
+cat("Generating ASV table\n")
 
 #dds <- readRDS(file = file.path(out.denois, "denoised_seqs.rds"))
 ASV_samples_table <- makeSequenceTable(dds)
 
-print(paste0("Found ", ncol(ASV_samples_table), " ASVs across the ", nrow(ASV_samples_table), " samples"))
+cat(paste0("Found ", ncol(ASV_samples_table), " ASVs across the ", nrow(ASV_samples_table), " samples", "\n"))
 
 ### Remove chimera ###
 
-print("Removing chimera")
+cat("Removing chimera\n")
 
 ASV_samples_table_noChim <- removeBimeraDenovo(ASV_samples_table, verbose = T, multithread = T)
 
@@ -173,15 +178,15 @@ rownames(ASV_samples_table_noChim) <- names
 
 saveRDS(ASV_samples_table_noChim, file.path(out.denois, "ASV_samples_table_noChim.rds"))
 
-print(paste0("Number of reads removed: ", sum(ASV_samples_table)-sum(ASV_samples_table_noChim)))
-print(paste0("Proportion of reads removed: ", round(1-sum(ASV_samples_table_noChim)/sum(ASV_samples_table),5)))
+cat(paste0("Number of reads removed: ", sum(ASV_samples_table)-sum(ASV_samples_table_noChim), "\n"))
+cat(paste0("Proportion of reads removed: ", round(1-sum(ASV_samples_table_noChim)/sum(ASV_samples_table),5), "\n"))
 
-print("Chimera removal done")
+cat("Chimera removal done\n")
 
 
 ### Rarefaction curves ###
 
-print("Generating rarefaction curves")
+cat("Generating rarefaction curves\n")
 
 # using iNEXT so I can also estimate the sampling coverage
 dt <- iNEXT(
@@ -278,7 +283,7 @@ write.table(
 
 ### Compute general statistics ###
 
-print("Plotting global statistics")
+cat("Plotting global statistics\n")
 
 parts <- str_count(pattern = "/", rownames(ASV_samples_table_noChim)[[1]])
 
@@ -359,7 +364,7 @@ ggsave(file.path(out.plots, "04_read_number_lines.pdf"), reads.plot1, device="pd
 ggsave(file.path(out.plots, "04_read_number_hist.pdf"), reads.plot2, device="pdf", width = 4, height = 8)
 
 
-print("Finished plotting global statistics")
+cat("Finished plotting global statistics\n")
 
 
-print("Denoising done")
+cat("Denoising done\n")

@@ -91,7 +91,7 @@ if (length(args) != 9){
 
 ### Create outdirs ###
 
-print("Creating directories")
+cat("\nCreating directories\n")
 
 dir.create(out.plots, recursive = TRUE, showWarnings = FALSE)
 dir.create(out.tax, recursive = TRUE, showWarnings = FALSE)
@@ -109,11 +109,11 @@ clusters <- read.table(input.clusters, sep = "\t", header = T)
 ### Rarefy reads if needed ###
 
 if (rarefy_to == -1){
-  print("No rarefaction")
+  cat("No rarefaction\n")
   ASV_samples_table_noChim2 <- ASV_samples_table_noChim
 } else {
   # rarefy reads
-  print(paste0("Rarefaction to ", rarefy_to, " reads; sample with fewer reads will be kept as is; ASVs with a subsequent total abundance of 0 will be removed"))
+  cat(paste0("Rarefaction to ", rarefy_to, " reads; sample with fewer reads will be kept as is; ASVs with a subsequent total abundance of 0 will be removed\n"))
   set.seed(42)
   raref <- Rarefy(ASV_samples_table_noChim, depth = rarefy_to)
   ASV_samples_table_noChim2 <- raref$otu.tab.rff 
@@ -122,7 +122,7 @@ if (rarefy_to == -1){
   
   # find ASVs with total abundance of 0
   ab <- apply(ASV_samples_table_noChim2, 2, sum)
-  print(paste0("Rarefaction led to ", length(names(ab[ab == 0])), " ASVs being removed"))
+  cat(paste0("Rarefaction led to ", length(names(ab[ab == 0])), " ASVs being removed\n"))
   
   # save these ASVs somewhere
   seqs <- DNAStringSet(names(ab[ab == 0]))
@@ -135,7 +135,7 @@ if (rarefy_to == -1){
 
 ### Assign taxonomy ###
 
-print(paste0("Using database ", db1, " to assign taxonomy"))
+cat(paste0("Using database ", db1, " to assign taxonomy\n"))
 
 ASV_taxonomy <- assignTaxonomy(
   seqs = ASV_samples_table_noChim2,
@@ -179,7 +179,7 @@ addSpecies_custom <- function(seqs, refFasta) {
     if (any(matched)) {
       matched_descriptions <- ref_descriptions[matched]
       if (length(matched_descriptions) > 1){
-        print(paste0("Found more than one match for ASV ", asv_name, "; not adding it to the results"))
+        cat(paste0("Found more than one match for ASV ", asv_name, "; not adding it to the results\n"))
       } else {
         temp_df <- data.frame(ASV = asv,
                               ASV_index = i,
@@ -194,7 +194,7 @@ addSpecies_custom <- function(seqs, refFasta) {
 }
 
 if (db2 != ""){
-  print(paste0("Using database ", db2, " to assign species"))
+  cat(paste0("Using database ", db2, " to assign species\n"))
   ASV_taxonomy2 <- addSpecies_custom(seqs = ASV_samples_table_noChim2, refFasta = db2)
   ASV_taxonomy2 <- ASV_taxonomy2 %>% 
     separate(ref_match, into = c("Species_addSp", "Strain", "Cluster"), sep = "-", remove = T) %>% 
@@ -226,7 +226,7 @@ if (db2 != ""){
     mutate(inferred_from = if_else(is.na(Cluster), "assignTaxonomy", "addSpecies_custom")) %>%
     arrange(Species)
   
-  print(paste0("Matched ", nrow(ASV_taxonomy3[ASV_taxonomy3$inferred_from == "addSpecies_custom", ]), " ASV(s) to reference sequences"))
+  cat(paste0("Matched ", nrow(ASV_taxonomy3[ASV_taxonomy3$inferred_from == "addSpecies_custom", ]), " ASV(s) to reference sequences\n"))
   
 } else {
   ASV_taxonomy3 <- as.data.frame(ASV_taxonomy)
@@ -242,13 +242,13 @@ if (db2 != ""){
 ASV_taxonomy4 <- ASV_taxonomy3 %>% 
   mutate(ASV = rownames(ASV_taxonomy3), .before = "Kingdom")
 
-print("Finished assigning taxonomy")
+cat("Finished assigning taxonomy\n")
 
 
 ### Reformat species name ###
 
-print("Reformatting species names")
-print("For ASVs with no assigned genus, the lowest assigned taxonomic rank is used as species name")
+cat("Reformatting species names\n")
+cat("For ASVs with no assigned genus, the lowest assigned taxonomic rank is used as species name.\n")
 
 ASV_taxonomy3 <- ASV_taxonomy3 %>% 
   mutate(lowest_assign_taxon = case_when(
@@ -264,7 +264,7 @@ ASV_taxonomy3 <- ASV_taxonomy3 %>%
 
 ### Create phyloseq object ###
 
-print("Creating phyloseq object")
+cat("Creating phyloseq object\n")
 
 ps <- phyloseq(otu_table(ASV_samples_table_noChim2, taxa_are_rows=F), 
                sample_data(meta),
@@ -273,20 +273,20 @@ ps <- phyloseq(otu_table(ASV_samples_table_noChim2, taxa_are_rows=F),
 
 ### Remove non-bacterial ASVs if present ###
 
-print("Filtering out non-bacterial, chloroplast and mitochondrial ASVs")
+cat("Filtering out non-bacterial, chloroplast and mitochondrial ASVs\n")
 
 #check for non-bacterial ASVs
-print(paste0("Represented domains: ", paste0(unique(ASV_taxonomy3$Kingdom), collapse = ", ")))
-print(paste0("Represented classes: ", paste0(sort(unique(ASV_taxonomy3$Class)), collapse = ", ")))
+cat(paste0("Represented domains: ", paste0(unique(ASV_taxonomy3$Kingdom), collapse = ", "), "\n"))
+cat(paste0("Represented classes: ", paste0(sort(unique(ASV_taxonomy3$Class)), collapse = ", "), "\n"))
 
 # remove non-bacterial ASVs
 ps <- subset_taxa(ps, Kingdom == "d__Bacteria" | is.na(Kingdom))
 ps <- subset_taxa(ps, Class != "c__Chloroplast" | is.na(Class))
 ps <- subset_taxa(ps, Family != "f__Mitochondria" | is.na(Family))
 
-print(paste0("Found and removed ", length(which(ASV_taxonomy[,1] != "d__Bacteria")), " non-bacterial ASV(s)"))
-print(paste0("Found and removed ", length(which(ASV_taxonomy[,3] == "c__Chloroplast")), " chloroplast ASV(s)"))
-print(paste0("Found and removed ", length(which(ASV_taxonomy[,5] == "f__Mitochondria")), " mitochondrial ASV(s)"))
+cat(paste0("Found and removed ", length(which(ASV_taxonomy[,1] != "d__Bacteria")), " non-bacterial ASV(s)\n"))
+cat(paste0("Found and removed ", length(which(ASV_taxonomy[,3] == "c__Chloroplast")), " chloroplast ASV(s)\n"))
+cat(paste0("Found and removed ", length(which(ASV_taxonomy[,5] == "f__Mitochondria")), " mitochondrial ASV(s)\n"))
 
 # save sequences and give new names to ASVs
 dna <- DNAStringSet(taxa_names(ps))
@@ -310,7 +310,7 @@ write.table(dna_df, file.path(out.tax, "ASV_name_tax.tsv"), sep = "\t", col.name
 saveRDS(object = ps, file = file.path(out.tax, "phyloseq_object.RDS"))
 # ps <- readRDS(file.path(out.tax, "phyloseq_object.RDS"))
 
-print("Finished creating and filtering phyloseq object")
+cat("Finished creating and filtering phyloseq object\n")
 
 ### Create a single abundance table ###
 
@@ -331,29 +331,29 @@ write.table(tab2, file.path(out.tax, "sample_ASV_table_long.tsv"), sep = "\t", q
 
 ### Check for single- and doubletons ###
 
-print("Checking for singletons and doubletons - note that singletons may be introduced by rarefaction")
+cat("Checking for singletons and doubletons - note that singletons may be introduced by rarefaction\n")
 
 tot <- sort(apply(X=tab, MARGIN=2, sum)) # total abundance of each ASV
 # show ASVs with total abundance of 1 or 2
 sdtons <- names(tot[tot < 3])
-print("The following ASVs have a total abundance of 1 or 2:")
-print(tax_table(ps)[sdtons, c("Species", "Strain")])
+cat("The following ASVs have a total abundance of 1 or 2:\n")
+cat(tax_table(ps)[sdtons, c("Species", "Strain")])
 extr <- tab[,sdtons]
 extr_sum <- apply(extr, 1, sum) # show only samples in which they are present
-print("Samples in which these ASVs were found:")
-print(tab[names(extr_sum[extr_sum != 0]),sdtons])
+cat("\nSamples in which these ASVs were found:\n")
+cat(tab[names(extr_sum[extr_sum != 0]),sdtons])
 
 # shows ASVs with low prevalence
 tab_bin <- tab
 tab_bin[tab_bin > 0] <- 1
 occ <- sort(apply(X=tab_bin, MARGIN=2, sum))
 low_occ <- names(occ[occ == 1])
-print("The following ASVs appear in only 1 sample:")
-print(tax_table(ps)[low_occ, c("Species", "Strain")])
+cat("\nThe following ASVs appear in only 1 sample:\n")
+cat(tax_table(ps)[low_occ, c("Species", "Strain")])
 
 ### Plotting most abundant taxa ###
 
-print("Plotting most abundant taxa")
+cat("\nPlotting most abundant taxa\n")
 
 top_nested <- nested_top_taxa(
   ps,
@@ -383,4 +383,4 @@ if (facet_var[1] != ""){
 
 ggsave(file.path(out.plots, "05_taxonomy_barplot.pdf"), tax_plot, device="pdf", width = 8, height = 6)
 
-print("Taxonomy assignment done")
+cat("Taxonomy assignment done\n")

@@ -65,7 +65,7 @@ Set up your working directory:
 
 You'll need access to a conda installation on your cluster. You can either have yours, installed for instance through miniforge3, or use the one provided by the cluster. This will change slightly how you activate environments at the beginning of the scripts. To use the cluster conda, follow the instructions [here](https://wiki.unil.ch/ci/books/high-performance-computing-hpc/page/using-conda-and-anaconda). To use your own conda installation, you just need to modify the `$CONDA_HOME` variable in the scripts.
 
-Install all the required conda environments using the .yaml files located in the *envs* folder with the command `conda env create -f envs/<env>.yaml`.
+Install all the required conda environments using the .yaml files located in the *envs* folder with the command `conda env create -f workflow/envs/<env>.yaml`.
 
 ### Data Preparation
 
@@ -82,7 +82,7 @@ Only the `.sh` scripts need to be modified. You will need to modify the beginnin
 
 - modify the commands to initialize conda according to the type of installation you are using
 - modify the input variables, for instance the path to the root directory
-- the fastQC scripts are array jobs (argument `--array` in the slurm header), so you need to modify the range of the arrays. `2-50` means you will process files described in lines 2 to 50 of `config/metadata.tsv`. We start at 2 to skip the header. So your array range should be `2-<number of samples>+1`
+- the pre-rarefaction and the fastQC scripts are array jobs (argument `--array` in the slurm header), so you need to modify the range of the arrays. `2-50` means you will process files described in lines 2 to 50 of `config/metadata.tsv`. We start at 2 to skip the header. So your array range should be `2-<number of samples>+1`
 - you should not need to modify the resource requirements, unless your jobs get killed.
 
 On top of this, each script requires customization of some script-specific variables. For instance, in `01_fastqc_preproc.sh` and `02_slurm_preprocessing.sh` you must modify the `reads` variable, depending on whether you did the pre-rarefaction step.
@@ -104,7 +104,9 @@ To run each script:
 | `05_slurm_assign_taxonomy.sh`            | Check for errors in log; check output plots                  |
 | `06_slurm_quantify_strains.sh`            | Check for errors in log; check output plots                  |
 
-**To run `06_slurm_quantify_strains.sh`, you first need to create your custom database (see below) and run `05_slurm_assign_taxonomy.sh` with this custom database as `db2`.**
+
+**Note 1:** the first time you run `02_slurm_preprocessing.sh`, some R packages will be installed. Most likely the execution will be halted with an error message after the dada2 installation. This is because the R environment needs to be reloaded. Simply run the script again and it should work.
+**Note 2:** to run `06_slurm_quantify_strains.sh`, you first need to create your custom database (see below) and run `05_slurm_assign_taxonomy.sh` with this custom database as `db2`.
 
 ---
 

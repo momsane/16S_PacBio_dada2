@@ -49,14 +49,14 @@ if (length(args) != 6){
 
 ### Create outdirs ###
 
-print("Creating directories")
+cat("\nCreating directories\n")
 
 dir.create(out.quant, recursive = TRUE, showWarnings = FALSE)
 dir.create(out.plots, recursive = TRUE, showWarnings = FALSE)
 
 ### Inputs ###
 
-print("Reading inputs and extracting info")
+cat("Reading inputs and extracting info\n")
 
 ps <- readRDS(input.ps)
 clusters <- read.table(input.clusters, sep = "\t", header = T)
@@ -72,8 +72,8 @@ tax <- tax %>%
 
 # Quantification of known strains
 
-print("Inferring strain abundance")
-print("Note: only ASVs matching the provided custom database will be used to infer strain abundance")
+cat("Inferring strain abundance\n")
+cat("Note: only ASVs matching the provided custom database will be used to infer strain abundance.\n")
 
 # A: ASV by sample matrix (r,c) = abundance of each ASV in each sample
 # B: ASV by strain matrix (r,c) = number of copies of each ASV in each strain
@@ -131,7 +131,7 @@ df <- df %>%
 
 write.table(df, file.path(out.quant, "strain_quantification_long_table.tsv"), sep = "\t", quote = F, col.names = T, row.names = F)
 
-print("Generating plots")
+cat("Generating plots\n")
 
 # generate barplot
 df <- df %>%
@@ -201,4 +201,4 @@ ggsave(file.path(out.plots, "06_strain_barplot_count.pdf"), p1, device="pdf", wi
 ggsave(file.path(out.plots, "06_strain_barplot_relative.pdf"), p2, device="pdf", width = 8, height = 6)
 
 
-print("Strain quantification done")
+cat("Strain quantification done\n")

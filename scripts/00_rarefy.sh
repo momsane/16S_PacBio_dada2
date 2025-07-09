@@ -18,7 +18,7 @@ module purge # Make sure nothing is already loaded
 # modify the path to your conda installation, or use the instructions from the curnagl wiki if using the cluster conda
 CONDA_HOME=/work/FAC/FBM/DMF/pengel/general_data/mgarci14/miniforge3 # Path to Conda installation
 source $CONDA_HOME/etc/profile.d/conda.sh # Source Conda initialization script
-conda activate bbmap-39.25 # Activate Conda env
+conda activate bbmap # Activate Conda env
 
 # Variables: modify these paths to your own
 root=/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis

@@ -41,7 +41,6 @@ dependencies:
   - hyperframe=6.1.0=pyhd8ed1ab_0
   - icu=75.1=he02047a_0
   - idna=3.10=pyhd8ed1ab_1
-  - importlib-metadata=8.7.0=pyhe01879c_0
   - importlib_resources=6.5.2=pyhd8ed1ab_0
   - jinja2=3.1.6=pyhd8ed1ab_0
   - jsonschema=4.23.0=pyhd8ed1ab_1
@@ -164,4 +163,4 @@ dependencies:
       - python-dateutil==2.9.0.post0
       - s3transfer==0.12.0
       - six==1.17.0
-prefix: /work/FAC/FBM/DMF/pengel/general_data/mgarci14/miniforge3/envs/qc
+      - importlib-metadata
