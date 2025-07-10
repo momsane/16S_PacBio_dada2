@@ -7,8 +7,8 @@
 #SBATCH --mem 2000
 #SBATCH --partition cpu
 #SBATCH --time 00:20:00
-#SBATCH --error /work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/logs/03_fastqc_postproc/multiqc.log
-#SBATCH --output /work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/logs/03_fastqc_postproc/multiqc.log
+#SBATCH --error /work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees/logs/03_fastqc_postproc/multiqc.log
+#SBATCH --output /work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees/logs/03_fastqc_postproc/multiqc.log
 
 echo -e "$(date) job $SLURM_JOB_ID $SLURM_ARRAY_TASK_ID"
 
@@ -19,8 +19,10 @@ CONDA_HOME=/work/FAC/FBM/DMF/pengel/general_data/mgarci14/miniforge3 # Path to C
 source $CONDA_HOME/etc/profile.d/conda.sh # Source Conda initialization script
 conda activate qc # Activate Conda env
 
-# Variables: modify these paths to your own
-root=/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis
+# Variable to modify
+root=/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees
+
+# do not modify below this line
 results="$root"/results/fastqc_postproc
 out="$root"/plots
 

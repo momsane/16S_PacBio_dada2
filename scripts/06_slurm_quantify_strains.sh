@@ -7,8 +7,8 @@
 #SBATCH --mem 4000
 #SBATCH --partition cpu
 #SBATCH --time 00:30:00
-#SBATCH --error /work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/logs/06_quantify_strains.log
-#SBATCH --output /work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/logs/06_quantify_strains.log
+#SBATCH --error /work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees/logs/06_quantify_strains.log
+#SBATCH --output /work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees/logs/06_quantify_strains.log
 
 echo -e "$(date) job $SLURM_JOB_ID $SLURM_ARRAY_TASK_ID"
 
@@ -19,13 +19,15 @@ CONDA_HOME=/work/FAC/FBM/DMF/pengel/general_data/mgarci14/miniforge3 # Path to C
 source $CONDA_HOME/etc/profile.d/conda.sh # Source Conda initialization script
 conda activate R # Activate Conda env
 
-# Variables: modify these paths to your own
-root=/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis
+# Variables to modify
+root=/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees
+clusters="$root"/workflow/config/all_16S_cd-hit_clusters_tax_full.tsv
+facet_var=SampleType
+
+# do not modify below this line
 script="$root"/workflow/scripts/06_quantify_strains.R
 ps="$root"/results/assign_taxonomy/phyloseq_object.RDS
-clusters="$root"/workflow/config/all_16S_cd-hit_clusters_tax_full.tsv
 metadata="$root"/workflow/config/metadata.tsv
-facet_var=SampleType
 out_quant="$root"/results/quantify_strains
 out_plots="$root"/plots
 

@@ -7,8 +7,8 @@
 #SBATCH --mem 16000
 #SBATCH --partition cpu
 #SBATCH --time 02:00:00
-#SBATCH --error /work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/logs/05_assign_taxonomy.log
-#SBATCH --output /work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/logs/05_assign_taxonomy.log
+#SBATCH --error /work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees/logs/05_assign_taxonomy.log
+#SBATCH --output /work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees/logs/05_assign_taxonomy.log
 
 echo -e "$(date) job $SLURM_JOB_ID $SLURM_ARRAY_TASK_ID"
 
@@ -19,16 +19,18 @@ CONDA_HOME=/work/FAC/FBM/DMF/pengel/general_data/mgarci14/miniforge3 # Path to C
 source $CONDA_HOME/etc/profile.d/conda.sh # Source Conda initialization script
 conda activate R # Activate Conda env
 
-# Variables: modify these paths to your own
-root=/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis
-script="$root"/workflow/scripts/05_assign_taxonomy.R
-asvs="$root"/results/denoising/ASV_samples_table_noChim.rds
-metadata="$root"/workflow/config/metadata.tsv
+# Variables to modify
+root=/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees
 db1="$root"/data/databases/syncom_custom_db_toSpecies_trainset.fa
 db2="$root"/data/databases/syncom_custom_db_addSpecies.fa
 clusters="$root"/workflow/config/all_16S_cd-hit_clusters_tax_full.tsv
 rarefy_to=-1 # -1 means no rarefaction; use the rarefaction curves to set this value to a relevant number if needed
 facet_var=SampleType
+
+# do not modify below this line
+script="$root"/workflow/scripts/05_assign_taxonomy.R
+asvs="$root"/results/denoising/ASV_samples_table_noChim.rds
+metadata="$root"/workflow/config/metadata.tsv
 out_tax="$root"/results/assign_taxonomy
 out_plots="$root"/plots
 

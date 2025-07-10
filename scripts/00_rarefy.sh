@@ -8,8 +8,8 @@
 #SBATCH --partition cpu
 #SBATCH --time 00:10:00
 #SBATCH --array=2-232
-#SBATCH --error /work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/logs/00_rarefy/%a.log
-#SBATCH --output /work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/logs/00_rarefy/%a.log
+#SBATCH --error /work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees/logs/00_rarefy/%a.log
+#SBATCH --output /work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees/logs/00_rarefy/%a.log
 
 echo -e "$(date) job $SLURM_JOB_ID $SLURM_ARRAY_TASK_ID"
 
@@ -20,13 +20,14 @@ CONDA_HOME=/work/FAC/FBM/DMF/pengel/general_data/mgarci14/miniforge3 # Path to C
 source $CONDA_HOME/etc/profile.d/conda.sh # Source Conda initialization script
 conda activate bbmap # Activate Conda env
 
-# Variables: modify these paths to your own
-root=/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis
-raw_reads="$root"/data/raw_reads
-rarefied_reads="$root"/results/prerarefied_reads
-table="$root"/workflow/config/pre_rarefaction.tsv # tab-separated table of 2 columns: SampleId and rarefy_to, with header
+# Variable to modify
+root=/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees
 
 # do not modify below this line
+raw_reads="$root"/data/raw_reads
+rarefied_reads="$root"/results/prerarefied_reads
+table="$root"/workflow/config/pre_rarefaction.tsv
+
 sample=$(awk -v ArrayTaskID=${SLURM_ARRAY_TASK_ID} 'NR==ArrayTaskID {print $1}' "$table")
 rarefy_to=$(awk -v ArrayTaskID=${SLURM_ARRAY_TASK_ID} 'NR==ArrayTaskID {print $2+0}' "$table")
 file="$raw_reads"/"$sample".fastq.gz

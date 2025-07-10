@@ -10,6 +10,11 @@ if(!require(tidyr)){
   library(tidyr)
 }
 
+if(!require(stringr)){
+  install.packages(pkgs = 'stringr', repos = 'https://stat.ethz.ch/CRAN/')
+  library(stringr)
+}
+
 if(!require(ggplot2)){
   install.packages(pkgs = 'ggplot2', repos = 'https://stat.ethz.ch/CRAN/')
   library(ggplot2)
@@ -77,8 +82,8 @@ if (length(args) != 9){
   out.plots <- args[9] # folder to write plots
 }
 
-# root <- "/Volumes/D2c/mgarcia/20240708_mgarcia_syncom_invivo/exp01_inoculation_methods/pacbio_analysis"
-# # root <- "/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis"
+# # root <- "/Volumes/D2c/mgarcia/20240708_mgarcia_syncom_invivo/exp01_inoculation_methods/pacbio_analysis"
+# root <- "/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees"
 # input.asvs <- file.path(root, "results", "denoising", "ASV_samples_table_noChim.rds")
 # input.metadata <- file.path(root, "workflow", "config", "metadata.tsv")
 # db1 <- file.path(root, "data", "databases", "syncom_custom_db_toSpecies_trainset.fa")
@@ -171,9 +176,9 @@ addSpecies_custom <- function(seqs, refFasta) {
     matched <- vapply(ref_seqs, function(ref) {
       rc_ref <- rc(ref)
       grepl(asv, ref, fixed = TRUE) ||
-      grepl(ref, asv, fixed = TRUE) ||
-      grepl(asv, rc_ref, fixed = TRUE) ||
-      grepl(ref, rc_ref, fixed = TRUE)
+        grepl(ref, asv, fixed = TRUE) ||
+        grepl(asv, rc_ref, fixed = TRUE) ||
+        grepl(ref, rc_ref, fixed = TRUE)
     }, logical(1))
     
     if (any(matched)) {
@@ -206,8 +211,8 @@ if (db2 != ""){
   
   # combine taxonomy from both functions
   ASV_taxonomy3 <- ASV_taxonomy3 %>% 
-    separate("Genus", into = c(NA,"Genus_clean"), sep = "g__", remove = F) %>% 
-    separate("Species", into = c(NA,"Species_clean"), sep = "s__", remove = F) %>% 
+    mutate(Genus_clean = str_remove(Genus, "^g__")) %>% 
+    mutate(Species_clean = str_remove(Species, "^s__")) %>% 
     mutate(Genus_clean = if_else(!is.na(Genus_addSp),Genus_addSp,Genus_clean)) %>% # overwriting genus with genus from addSpecies if there is a hit
     mutate(Species_clean = case_when(
       !is.na(Genus_addSp) ~ Species_addSp,
@@ -284,9 +289,9 @@ ps <- subset_taxa(ps, Kingdom == "d__Bacteria" | is.na(Kingdom))
 ps <- subset_taxa(ps, Class != "c__Chloroplast" | is.na(Class))
 ps <- subset_taxa(ps, Family != "f__Mitochondria" | is.na(Family))
 
-cat(paste0("Found and removed ", length(which(ASV_taxonomy[,1] != "d__Bacteria")), " non-bacterial ASV(s)\n"))
 cat(paste0("Found and removed ", length(which(ASV_taxonomy[,3] == "c__Chloroplast")), " chloroplast ASV(s)\n"))
 cat(paste0("Found and removed ", length(which(ASV_taxonomy[,5] == "f__Mitochondria")), " mitochondrial ASV(s)\n"))
+cat(paste0("Found and removed ", length(which(ASV_taxonomy[,1] != "d__Bacteria")), " other non-bacterial ASV(s)\n"))
 
 # save sequences and give new names to ASVs
 dna <- DNAStringSet(taxa_names(ps))
@@ -302,7 +307,7 @@ writeXStringSet(dna, file.path(out.tax, "ASVs_dada2.fasta"))
 # write as df with taxonomy
 dna_df <- data.frame(
   seq = dna
-  ) %>% 
+) %>% 
   merge(tax_table(ps), by=0) %>% 
   dplyr::rename(ASV = Row.names)
 write.table(dna_df, file.path(out.tax, "ASV_name_tax.tsv"), sep = "\t", col.names = T, row.names = F, quote = F)
@@ -337,11 +342,18 @@ tot <- sort(apply(X=tab, MARGIN=2, sum)) # total abundance of each ASV
 # show ASVs with total abundance of 1 or 2
 sdtons <- names(tot[tot < 3])
 cat("The following ASVs have a total abundance of 1 or 2:\n")
-cat(tax_table(ps)[sdtons, c("Species", "Strain")])
+cat(tax_table(ps)[sdtons, c("Species")])
+# show only samples in which they are present
 extr <- tab[,sdtons]
-extr_sum <- apply(extr, 1, sum) # show only samples in which they are present
-cat("\nSamples in which these ASVs were found:\n")
-cat(tab[names(extr_sum[extr_sum != 0]),sdtons])
+if (is.null(dim(extr))){
+  extr_sum <- extr
+  cat("\nSample(s) in which this ASV was found:\n")
+  cat(names(extr_sum[extr_sum != 0]))
+} else {
+  extr_sum <- apply(extr, 1, sum) 
+  cat("\nSamples in which these ASVs were found:\n")
+  print(tab[names(extr_sum[extr_sum != 0]),sdtons])
+}
 
 # shows ASVs with low prevalence
 tab_bin <- tab
@@ -349,7 +361,7 @@ tab_bin[tab_bin > 0] <- 1
 occ <- sort(apply(X=tab_bin, MARGIN=2, sum))
 low_occ <- names(occ[occ == 1])
 cat("\nThe following ASVs appear in only 1 sample:\n")
-cat(tax_table(ps)[low_occ, c("Species", "Strain")])
+cat(tax_table(ps)[low_occ, c("Species")])
 
 ### Plotting most abundant taxa ###
 
@@ -361,11 +373,11 @@ top_nested <- nested_top_taxa(
   nested_tax_level = "Species", # most abundant genera within those orders
   n_top_taxa = 8, # top 8 most abundant genera
   n_nested_taxa = 2 # top 2 most abundant species
-  )
+)
 
 tax_plot <- plot_nested_bar(ps_obj = top_nested$ps_obj, 
-                           top_level = "Genus", nested_level = "Species",
-                           legend_title = "Taxonomy") + 
+                            top_level = "Genus", nested_level = "Species",
+                            legend_title = "Taxonomy") + 
   theme_nested(theme_classic) + ylab("Relative abundance") + 
   theme(
     #strip.text.x = element_text(angle=90),
@@ -374,7 +386,7 @@ tax_plot <- plot_nested_bar(ps_obj = top_nested$ps_obj,
     axis.text.x=element_blank(),
     axis.ticks.x=element_blank(),
     legend.key.size = unit(0.4, "cm")
-    ) + 
+  ) + 
   guides(fill=guide_legend(ncol =1))
 
 if (facet_var[1] != ""){

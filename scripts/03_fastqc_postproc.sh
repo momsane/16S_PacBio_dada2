@@ -8,8 +8,8 @@
 #SBATCH --partition cpu
 #SBATCH --time 00:20:00
 #SBATCH --array=2-232
-#SBATCH --error /work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/logs/03_fastqc_postproc/%a.log
-#SBATCH --output /work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/logs/03_fastqc_postproc/%a.log
+#SBATCH --error /work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees/logs/03_fastqc_postproc/%a.log
+#SBATCH --output /work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees/logs/03_fastqc_postproc/%a.log
 
 echo -e "$(date) job $SLURM_JOB_ID $SLURM_ARRAY_TASK_ID"
 
@@ -20,10 +20,12 @@ CONDA_HOME=/work/FAC/FBM/DMF/pengel/general_data/mgarci14/miniforge3 # Path to C
 source $CONDA_HOME/etc/profile.d/conda.sh # Source Conda initialization script
 conda activate qc # Activate Conda env
 
-# Variables: modify these paths to your own
-root=/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis
+# Variable to modify
+root=/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees
+
+# do not modify below this line
 reads="$root"/results/preprocessing/trimmed_filtered_reads
-metadata="$root"/workflow/config/metadata.tsv # tab-delimited table, with header; SampleId in the first column (i.e. filename without the .fastq.gz extension)
+metadata="$root"/workflow/config/metadata.tsv
 
 sample=$(awk -v ArrayTaskID=${SLURM_ARRAY_TASK_ID} 'NR==ArrayTaskID {print $1}' "$metadata")
 out="$root"/results/fastqc_postproc/"$sample"

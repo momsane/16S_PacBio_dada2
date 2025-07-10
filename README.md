@@ -20,6 +20,8 @@
 
 ## Running the dada2 pipeline
 
+**Important note**: this pipeline should be executed independently for separate runs, as the error profile is unique to each run.
+
 ### Overview
 
 The pipeline consists of a few main steps:
@@ -63,18 +65,20 @@ Set up your working directory:
 
 #### Conda environments
 
-You'll need access to a conda installation on your cluster. You can either have yours, installed for instance through miniforge3, or use the one provided by the cluster. This will change slightly how you activate environments at the beginning of the scripts. To use the cluster conda, follow the instructions [here](https://wiki.unil.ch/ci/books/high-performance-computing-hpc/page/using-conda-and-anaconda). To use your own conda installation, you just need to modify the `$CONDA_HOME` variable in the scripts.
+You'll need access to a conda installation on your cluster. You can either have yours, installed for instance through miniforge3, or use the one provided by the cluster. This will change slightly how you activate environments at the beginning of the scripts.
+- To use the cluster conda, follow the instructions [here](https://wiki.unil.ch/ci/books/high-performance-computing-hpc/page/using-conda-and-anaconda).
+- To use your own conda installation, you just need to modify the `$CONDA_HOME` variable in the scripts.
 
 Install all the required conda environments using the .yaml files located in the *envs* folder with the command `conda env create -f workflow/envs/<env>.yaml`.
 
 ### Data Preparation
 
-Before running the pipeline, you need to prepare some data:
+Before running the pipeline, you need to prepare some data. It is important that each of these tables be in Unix format. If you modify them in Excel for instance, they will not be in Unix format. You can use the command-line tool dos2unix to convert them. Make sure also there is a line return after the last line in the table otherwise the last line will not be read.
 
-1.  **File naming Table:** the raw read files you got from the sequencing facility have long non-informative names. If not done already, you will rename them with the SampleID. Create a table like `config/rename_files.tsv` where the first column is the current name of each file, and the second column is the new name. This table has no header. It is important that this table be in Unix format. If you modify it in Excel for instance, it will not be in Unix format. You can use the command-line tool dos2unix to convert it. Make sure there is a line return after the last line in the table.
+1.  **File naming table:** the raw read files you got from the sequencing facility have long non-informative names. If not done already, you will rename them with the SampleID. Create a table like `config/rename_files.tsv` where the first column is the current name of each file, and the second column is the new name. This table has no header. If you have samples from different pools, you will need to create one table per pool because some samples might have the same original name.
 2.  **Metadata file:** modify `config/metadata.tsv` according to your samples. You do not need to keep the same columns except for the first one. This first column must contain the sample names (filenames without the `.fastq.gz` extension).
-3.  **Read rarefaction table (optional):** if you have very uneven depth in your dataset, you might want to consider rarefying the raw reads to limit unnecessary computation time and resources for large samples. Modify `config/pre_rarefaction.tsv` according to your needs. For bee gut samples, 20,000 reads is way more than enough. As with `config/rename_files.tsv`, make sure it is in Unix format.
-4.  **Raw reads:** you are now ready to copy them from the NAS. Modify the script `copy_rename_files.sh` with the correct paths. Then execute it from the login node (i.e. use `bash` instead of `sbatch` to submit it).
+3.  **Read rarefaction table (optional):** if you have very uneven depth in your dataset, you might want to consider rarefying the raw reads to limit unnecessary computation time and resources for large samples. Modify `config/pre_rarefaction.tsv` according to your needs. For bee gut samples, 20,000 reads is way more than enough.
+4.  **Raw reads:** you are now ready to copy them from the NAS. Modify the script `copy_rename_files.sh` with the correct paths. Then execute it from the login node (i.e. use `bash` instead of `sbatch` to submit it). If you have samples from different pools, you will need to execute this script independently for each pool.
 
 ### Adapting the scripts
 
@@ -105,7 +109,8 @@ To run each script:
 | `06_slurm_quantify_strains.sh`            | Check for errors in log; check output plots                  |
 
 
-**Note 1:** the first time you run `02_slurm_preprocessing.sh`, some R packages will be installed. Most likely the execution will be halted with an error message after the dada2 installation. This is because the R environment needs to be reloaded. Simply run the script again and it should work.
+**Note 1:** the first time you run `02_slurm_preprocessing.sh` and `05_slurm_assign_taxonomy.sh`, some R packages will be installed. The execution might be halted with an error message after the last installation. This is because the R environment needs to be reloaded. Simply run the script again and it should work.
+
 **Note 2:** to run `06_slurm_quantify_strains.sh`, you first need to create your custom database (see below) and run `05_slurm_assign_taxonomy.sh` with this custom database as `db2`.
 
 ---
@@ -117,7 +122,11 @@ This can be done entirely on your local computer. It is highly recommended to us
 
 ### Install required tools
 
-Create the following conda environment: `conda create custom_db_dada2 bioconda::seqkit bioconda::cd-hit conda-forge::dos2unix`.
+Create and activate the following conda environment:
+```
+conda create custom_db_dada2 bioconda::seqkit bioconda::cd-hit conda-forge::dos2unix
+conda activate custom_db_dada2
+```
 
 ### Merging and dereplicating 16S sequences
 
@@ -160,12 +169,13 @@ awk 'BEGIN { FS = OFS = "\t" }; NR > 1 { print $2, $1 }' all_16S_cd-hit_clusters
 7. Change the sequence IDs in `all_16S_cd-hit`: `seqkit replace -p '^(\S+)' -r '{kv}$2' -k all_16S_cd-hit_clusters_rename.tsv all_16S_cd-hit > all_16S_cd-hit_renamed.fna`.
 
 8. 
-    - Create a copy of `all_16S_cd-hit_clusters.tsv` named `all_16S_cd-hit_clusters_tax_full.tsv`.
+    - Create a copy of `all_16S_cd-hit_clusters.tsv` named `all_16S_cd-hit_clusters_tax_full.tsv`: `cp all_16S_cd-hit_clusters.tsv all_16S_cd-hit_clusters_tax_full.tsv`.
     - Open it in excel, and add a third column `taxonomy_full` with the full taxonomy of your strains. If you will merge it with GreenGenes2, it must be in GTDB-like taxonomy format, like *d__Bacteria;p__Bacillota_I;c__Bacilli_A;o__Lactobacillales;f__Lactobacillaceae;g__Bombilactobacillus;s__Bombilactobacillus mellifer*. If you are merging with SILVA, the format would be *Bacteria;Bacillota;Bacilli;Lactobacillales;Lactobacillaceae;Bombilactobacillus;mellifer;*.
     - Use `TEXTSPLIT` from excel to get a fourth column `taxonomy_genus` with only the taxonomy down to genus (keeping a semi-colon at the end), and a fifth column `genus_species` with the full species name.
     - Create a sixth column `strain` with the strain name.
     - Append the strain name and cluster number to `genus_species` using "-" as a delimiter.
     - Create a seventh column `taxonomy_species` that is basically the same as `taxonomy_full` but you remove the genus in the species name.
+    - Create an eighth column `use_to_quantify` indicating whether this specific sequence can be used to quantify your strains. Put `FALSE` if the number of copies of this sequence in your strain is unclear.
     - See the attached example for merging with GreenGenes2. Once you are done editing it, make sure it is **tab-delimited** and in **Unix format** `dos2unix all_16S_cd-hit_clusters_tax_full.tsv`.
 
 9. Make a copy of `all_16S_cd-hit_clusters_tax_full.tsv` with only columns 1 and 4, remove the header, and remove redundant lines: `awk ' BEGIN { FS = OFS = "\t" }; NR > 1 {print $1, $4}' all_16S_cd-hit_clusters_tax_full.tsv | sort -k1,1 | uniq > all_16S_cd-hit_clusters_tax_genus.txt`. Now you should end up with a table reporting the genus-level taxonomy of each cluster. You might have had several different strains in one cluster at **step 5**, but they should still all belong to the same genus, therefore each cluster should appear only once in the table.
@@ -201,7 +211,7 @@ seqkit seq compare_gg2_custom_toGenus > syncom_custom_db_toGenus_trainset.fa
 cat syncom_custom_db_toGenus.fa >> syncom_custom_db_toGenus_trainset.fa
 ```
 
-You are now ready to use the custom databases with dada2. You will also `all_16S_cd-hit_clusters_tax_full.tsv` to run the strain quantification script. I personally like to use the `toSpecies_trainset` with `assignTaxonomy()`, but you can instead use the `toGenus_trainset` with this function to limit memory usage if you are not interested in the species classification of 'contaminants'.
+You are now ready to use the custom databases with dada2. You will also need `all_16S_cd-hit_clusters_tax_full.tsv` to run the strain quantification script. I personally like to use the `toSpecies_trainset` with `assignTaxonomy()`, but you can instead use the `toGenus_trainset` with this function to limit memory usage if you are not interested in the species classification of 'contaminants'.
 
 ---
 

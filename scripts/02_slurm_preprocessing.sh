@@ -7,8 +7,8 @@
 #SBATCH --mem 64000
 #SBATCH --partition cpu
 #SBATCH --time 02:00:00
-#SBATCH --error /work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/logs/02_preprocessing.log
-#SBATCH --output /work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/logs/02_preprocessing.log
+#SBATCH --error /work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees/logs/02_preprocessing.log
+#SBATCH --output /work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees/logs/02_preprocessing.log
 
 echo -e "$(date) job $SLURM_JOB_ID $SLURM_ARRAY_TASK_ID"
 
@@ -19,18 +19,18 @@ CONDA_HOME=/work/FAC/FBM/DMF/pengel/general_data/mgarci14/miniforge3 # Path to C
 source $CONDA_HOME/etc/profile.d/conda.sh # Source Conda initialization script
 conda activate R # Activate Conda env
 
-# Variables: modify these paths to your own
-root=/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis
-script="$root"/workflow/scripts/02_preprocessing.R
-
+# Variables to modify/comment
+root=/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees
 #raw_fastq_dir="$root"/data/raw_reads # if you did not pre-rarefy
 raw_fastq_dir="$root"/results/prerarefied_reads # if you pre-rarefied
-
 fwd_primer=AGRGTTYGATYMTGGCTCAG
 rev_primer=RGYTACCTTGTTACGACTT
 minLen=1400
 maxLen=1600
 maxEE=3 # use 2 for normal PacBio, 3 for Kinnex
+
+# do not modify below this line
+script="$root"/workflow/scripts/02_preprocessing.R
 out_preproc="$root"/results/preprocessing
 out_plots="$root"/plots
 

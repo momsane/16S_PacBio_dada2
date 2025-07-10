@@ -38,8 +38,8 @@ if (length(args) != 6){
   out.plots <- args[6] # folder to write plots
 }
 
-# root <- "/Volumes/D2c/mgarcia/20240708_mgarcia_syncom_invivo/exp01_inoculation_methods/pacbio_analysis"
-# # root <- "/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis"
+# # root <- "/Volumes/D2c/mgarcia/20240708_mgarcia_syncom_invivo/exp01_inoculation_methods/pacbio_analysis"
+# root <- "/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees"
 # input.ps <- file.path(root, "results", "assign_taxonomy", "phyloseq_object.RDS")
 # input.clusters <- file.path(root, "workflow", "config", "all_16S_cd-hit_clusters_tax_full.tsv")
 # input.metadata <- file.path(root, "workflow", "config", "metadata.tsv")
@@ -80,8 +80,11 @@ cat("Note: only ASVs matching the provided custom database will be used to infer
 # C: strain by sample matrix (r,c) = abundance of each strain in each sample <- this is what we want!
 # We know A and B, and that A=B.C
 
-# keep only ASVs matching a syncom ASV
-cls <- sort(unique(tax$ASV[tax$inferred_from == "addSpecies_custom"]))
+# remove ASV clusters that the user does not want to use for quantification
+cls_use <- clusters$cluster[clusters$use_to_quantify == TRUE]
+
+# keep only ASVs matching a syncom ASV and used for quantification
+cls <- sort(unique(tax$ASV[tax$inferred_from == "addSpecies_custom" & tax$Cluster %in% cls_use]))
 tab2 <- t(tab[ ,cls]) # = matrix A
 
 # rename ASVs by cluster instead
@@ -108,7 +111,7 @@ length(match[match==FALSE]) # should be 0
 # solve the strain by sample matrix 
 C = round(qr.solve(clusters3,tab2))
 
-# compute relative abundance
+# compute relative abundance (there will be NA values for blanks or MD bees)
 C_rel <- 100*scale(C, center = FALSE, scale = colSums(C))
 
 # save matrices

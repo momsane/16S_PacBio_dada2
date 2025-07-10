@@ -6,16 +6,12 @@ path_to_nas=/nas/FAC/FBM/DMF/pengel/general_data/D2c/datasets/NGS_data/20250318_
 path_to_cluster=/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/data/raw_reads
 name_table=/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/workflow/config/rename_files.tsv 
 # tab-separated table with two columns only (no header): first column = original name, second column = new name
-# make sure to add an empty line at the bottom, otherwise the last file won't be renamed
+# make sure to add an empty line at the bottom, otherwise the last file won't be processed
 # make sure the table is in Unix format! use dos2unix to convert it if necessary
 
-# copy files
-cp "$path_to_nas"/*.fastq.gz "$path_to_cluster"
-
-# rename files
-cd "$path_to_cluster"
+# copy and rename files
 while read -r oldname newname; do
-    mv "$oldname" "$newname"
+    cp "$path_to_nas"/"$oldname" "$path_to_cluster"/"$newname"
 done < "$name_table"
 
 # check file names
