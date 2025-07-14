@@ -76,9 +76,10 @@ Install all the required conda environments using the .yaml files located in the
 Before running the pipeline, you need to prepare some data. It is important that each of these tables be in Unix format. If you modify them in Excel for instance, they will not be in Unix format. You can use the command-line tool dos2unix to convert them. Make sure also there is a line return after the last line in the table otherwise the last line will not be read.
 
 1.  **File naming table:** the raw read files you got from the sequencing facility have long non-informative names. If not done already, you will rename them with the SampleID. Create a table like `config/rename_files.tsv` where the first column is the current name of each file, and the second column is the new name. This table has no header. If you have samples from different pools, you will need to create one table per pool because some samples might have the same original name.
-2.  **Metadata file:** modify `config/metadata.tsv` according to your samples. You do not need to keep the same columns except for the first one. This first column must contain the sample names (filenames without the `.fastq.gz` extension).
+2.  **Metadata file:** modify `config/metadata.tsv` according to your samples. You do not need to keep the same columns except for the first one, `SampleID`. This first column must contain the sample names (filenames without the `.fastq.gz` extension). Make sure there are no empty cells in this table - use NA values if necessary.
 3.  **Read rarefaction table (optional):** if you have very uneven depth in your dataset, you might want to consider rarefying the raw reads to limit unnecessary computation time and resources for large samples. Modify `config/pre_rarefaction.tsv` according to your needs. For bee gut samples, 20,000 reads is way more than enough.
 4.  **Raw reads:** you are now ready to copy them from the NAS. Modify the script `copy_rename_files.sh` with the correct paths. Then execute it from the login node (i.e. use `bash` instead of `sbatch` to submit it). If you have samples from different pools, you will need to execute this script independently for each pool.
+5. **Databases:** you need to provide at least one database to assign taxonomy to your ASVs. Refer to [this web page](https://benjjneb.github.io/dada2/training.html) for more information and links to download the databases.
 
 ### Adapting the scripts
 
@@ -101,7 +102,7 @@ To run each script:
 | Script           | What to check                                       |
 |--------------------|---------------------------------------------------|
 | `00_rarefy.sh`        | Size of output fastQ files is > 0                            |
-| `01_fastqc_preproc.sh` & `03_fastqc_postproc.sh`      | Combine all logs into a single file and check that "Analysis complete" appears as many times as samples: `cat ../../logs/01_fastqc_preproc/*.log > ../../logs/01_fastqc_preproc/combined_logs.log; grep -c "Analysis complete" ../../logs/01_fastqc_preproc/combined_logs.log`                            |
+| `01_fastqc_preproc.sh` & `03_fastqc_postproc.sh`      | Output folders are not empty                            |
 | `01_multiqc_preproc.sh` & `03_multiqc_postproc.sh`            | Look at HTML report                  |
 | `02_slurm_preprocessing.sh`            | Check for errors in log; check number of fastQ files in results/preprocessing/primerfree_reads & results/preprocessing/trimmed_filtered_reads; check output plot                  |
 | `04_slurm_denoising.sh`            | Check for errors in log; check output plots                  |

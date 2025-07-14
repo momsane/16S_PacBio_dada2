@@ -10,6 +10,11 @@ if(!require(tidyr)){
   library(tidyr)
 }
 
+if(!require(readr)){
+  install.packages(pkgs = 'readr', repos = 'https://stat.ethz.ch/CRAN/')
+  library(readr)
+}
+
 if(!require(stringr)){
   install.packages(pkgs = 'stringr', repos = 'https://stat.ethz.ch/CRAN/')
   library(stringr)
@@ -68,27 +73,25 @@ if(!require(ggnested)){
 
 args <- commandArgs(trailingOnly = TRUE)
 
-if (length(args) != 9){
-  stop(" Usage: 05_assign_taxonomy.R <ASV_table> <metadata_table.tsv> <db_tax> <db_species> <clusters_tax> <rarefy_to> <facet_var> <tax_results_dir> <plots_dir>", call.=FALSE)
+if (length(args) != 8){
+  stop(" Usage: 05_assign_taxonomy.R <ASV_table> <metadata_table.tsv> <db_tax> <db_species> <rarefy_to> <facet_var> <tax_results_dir> <plots_dir>", call.=FALSE)
 } else {
   input.asvs <- args[1] # ASV table (no chimera)
   input.metadata <- args[2] # sample metadata table, tab-separated, first column is the the sample name
   db1 <- args[3] # taxonomy database for assignTaxonomy (GreenGenes2, SILVA, or custom)
   db2 <- args[4] # taxonomy database for addSpecies (SILVA or custom), put "" if not needed
-  input.clusters <- args[5] # table of ASVs with their assigned cd-hit cluster and user-input taxonomy
-  rarefy_to <- args[6] # number of reads to rarefy to; if equals -1, no rarefaction
-  facet_var <- args[7] # one column in the metadata table to facet the taxonomy plot, put "" if not needed
-  out.tax <- args[8] # folder to write denoising results
-  out.plots <- args[9] # folder to write plots
+  rarefy_to <- args[5] # number of reads to rarefy to; if equals -1, no rarefaction
+  facet_var <- args[6] # one column in the metadata table to facet the taxonomy plot, put "" if not needed
+  out.tax <- args[7] # folder to write denoising results
+  out.plots <- args[8] # folder to write plots
 }
 
-# # root <- "/Volumes/D2c/mgarcia/20240708_mgarcia_syncom_invivo/exp01_inoculation_methods/pacbio_analysis"
-# root <- "/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees"
+# root <- "/Volumes/D2c/mgarcia/20240708_mgarcia_syncom_invivo/exp01_inoculation_methods/pacbio_analysis/run1_bees"
+# # root <- "/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees"
 # input.asvs <- file.path(root, "results", "denoising", "ASV_samples_table_noChim.rds")
 # input.metadata <- file.path(root, "workflow", "config", "metadata.tsv")
-# db1 <- file.path(root, "data", "databases", "syncom_custom_db_toSpecies_trainset.fa")
-# db2 <- file.path(root, "data", "databases", "syncom_custom_db_addSpecies.fa")
-# input.clusters <- file.path(root, "workflow", "config", "all_16S_cd-hit_clusters_tax_full.tsv")
+# db1 <- file.path(root, "data", "databases", "amplicon_based_db", "syncom_custom_db_toSpecies_trainset.fa")
+# db2 <- file.path(root, "data", "databases", "amplicon_based_db", "syncom_custom_db_addSpecies.fa")
 # rarefy_to <- -1
 # facet_var <- "SampleType"
 # out.tax <- file.path(root, "results", "assign_taxonomy")
@@ -106,10 +109,10 @@ dir.create(out.tax, recursive = TRUE, showWarnings = FALSE)
 rarefy_to <- as.numeric(rarefy_to)
 
 ASV_samples_table_noChim <- readRDS(input.asvs)
-meta <- read.table(input.metadata, sep = "\t", header = T)
-rownames(meta) = meta[ ,1]
+meta <- as.data.frame(read_tsv(input.metadata, show_col_types = F))
+rownames(meta) = meta$SampleID
 
-clusters <- read.table(input.clusters, sep = "\t", header = T)
+#clusters <- read.table(input.clusters, sep = "\t", header = T)
 
 ### Rarefy reads if needed ###
 
@@ -211,8 +214,8 @@ if (db2 != ""){
   
   # combine taxonomy from both functions
   ASV_taxonomy3 <- ASV_taxonomy3 %>% 
-    mutate(Genus_clean = str_remove(Genus, "^g__")) %>% 
-    mutate(Species_clean = str_remove(Species, "^s__")) %>% 
+    separate("Genus", into = c(NA,"Genus_clean"), sep = "g__", remove = F) %>% 
+    separate("Species", into = c(NA,"Species_clean"), sep = "s__", remove = F) %>% 
     mutate(Genus_clean = if_else(!is.na(Genus_addSp),Genus_addSp,Genus_clean)) %>% # overwriting genus with genus from addSpecies if there is a hit
     mutate(Species_clean = case_when(
       !is.na(Genus_addSp) ~ Species_addSp,
@@ -239,6 +242,9 @@ if (db2 != ""){
     ASV_taxonomy3$Species <- NA
   }
   ASV_taxonomy3 <- ASV_taxonomy3 %>% 
+    mutate(Species2 = if_else(!is.na(Species), paste(Genus, Species),NA)) %>%
+    dplyr::select(-c(Species)) %>% 
+    dplyr::rename(Species = Species2) %>%
     mutate(Strain = NA) %>%
     mutate(Cluster = NA) %>%
     mutate(inferred_from = "assignTaxonomy")
@@ -261,9 +267,11 @@ ASV_taxonomy3 <- ASV_taxonomy3 %>%
     is.na(Class) ~ Phylum,
     is.na(Order) ~ Class,
     is.na(Family) ~ Order,
-    is.na(Genus) ~ Family
+    is.na(Genus) ~ Family,
+    is.na(Species) ~ Genus,
   )) %>%
-  mutate(Species = if_else(Species == "s__", paste(lowest_assign_taxon, "sp."),Species)) %>% 
+  mutate(Species = if_else((Species %in% c("s__", "") | is.na(Species)), paste(lowest_assign_taxon, "sp."),Species)) %>% 
+  mutate(Species = gsub("d__|p__|c__|o__|f__|g__", "s__", Species)) %>% 
   dplyr::select(-"lowest_assign_taxon")
 
 
@@ -271,9 +279,19 @@ ASV_taxonomy3 <- ASV_taxonomy3 %>%
 
 cat("Creating phyloseq object\n")
 
-ps <- phyloseq(otu_table(ASV_samples_table_noChim2, taxa_are_rows=F), 
-               sample_data(meta),
-               tax_table(as.matrix(ASV_taxonomy3)))
+otu <- otu_table(ASV_samples_table_noChim2, taxa_are_rows=F)
+sdata <- sample_data(meta)
+tax <- tax_table(as.matrix(ASV_taxonomy3))
+check_match <- setdiff(rownames(otu), rownames(sdata))
+
+if (length(check_match) != 0){
+  cat(paste0("Non-matching sample name(s) between the ASV table and the metadata table: ", paste0(check_match, collapse = ",")))
+}
+
+ps <- phyloseq(otu, 
+               sdata,
+               tax
+)
 
 
 ### Remove non-bacterial ASVs if present ###
@@ -285,13 +303,14 @@ cat(paste0("Represented domains: ", paste0(unique(ASV_taxonomy3$Kingdom), collap
 cat(paste0("Represented classes: ", paste0(sort(unique(ASV_taxonomy3$Class)), collapse = ", "), "\n"))
 
 # remove non-bacterial ASVs
-ps <- subset_taxa(ps, Kingdom == "d__Bacteria" | is.na(Kingdom))
-ps <- subset_taxa(ps, Class != "c__Chloroplast" | is.na(Class))
-ps <- subset_taxa(ps, Family != "f__Mitochondria" | is.na(Family))
+ps <- subset_taxa(ps, Kingdom %in% c("d__Bacteria", "Bacteria", "k__Bacteria") | is.na(Kingdom))
+ps <- subset_taxa(ps, !(Class %in% c("c__Chloroplast", "Chloroplast")) | is.na(Class))
+ps <- subset_taxa(ps, !(Order %in% c("c__Chloroplast", "Chloroplast")) | is.na(Order))
+ps <- subset_taxa(ps, !(Family %in% c("f__Mitochondria", "Mitochondria")) | is.na(Family))
 
-cat(paste0("Found and removed ", length(which(ASV_taxonomy[,3] == "c__Chloroplast")), " chloroplast ASV(s)\n"))
-cat(paste0("Found and removed ", length(which(ASV_taxonomy[,5] == "f__Mitochondria")), " mitochondrial ASV(s)\n"))
-cat(paste0("Found and removed ", length(which(ASV_taxonomy[,1] != "d__Bacteria")), " other non-bacterial ASV(s)\n"))
+cat(paste0("Found and removed ", length(which(!(ASV_taxonomy[,1] %in% c("d__Bacteria", "Bacteria", "k__Bacteria")))), " non-bacterial ASV(s)\n"))
+cat(paste0("Found and removed ", length(which(ASV_taxonomy[,3] %in% c("c__Chloroplast", "Chloroplast")))+length(which(ASV_taxonomy[,4] %in% c("c__Chloroplast", "Chloroplast"))), " chloroplast ASV(s)\n"))
+cat(paste0("Found and removed ", length(which(ASV_taxonomy[,5] %in% c("f__Mitochondria", "Mitochondria"))), " mitochondrial ASV(s)\n"))
 
 # save sequences and give new names to ASVs
 dna <- DNAStringSet(taxa_names(ps))
@@ -342,7 +361,7 @@ tot <- sort(apply(X=tab, MARGIN=2, sum)) # total abundance of each ASV
 # show ASVs with total abundance of 1 or 2
 sdtons <- names(tot[tot < 3])
 cat("The following ASVs have a total abundance of 1 or 2:\n")
-cat(tax_table(ps)[sdtons, c("Species")])
+print(tax_table(ps)[sdtons, c("Species")])
 # show only samples in which they are present
 extr <- tab[,sdtons]
 if (is.null(dim(extr))){
@@ -361,7 +380,7 @@ tab_bin[tab_bin > 0] <- 1
 occ <- sort(apply(X=tab_bin, MARGIN=2, sum))
 low_occ <- names(occ[occ == 1])
 cat("\nThe following ASVs appear in only 1 sample:\n")
-cat(tax_table(ps)[low_occ, c("Species")])
+print(tax_table(ps)[low_occ, c("Species")])
 
 ### Plotting most abundant taxa ###
 

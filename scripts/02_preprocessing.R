@@ -20,6 +20,11 @@ if(!require(tidyr)){
   library(tidyr)
 }
 
+if(!require(readr)){
+  install.packages(pkgs = 'readr', repos = 'https://stat.ethz.ch/CRAN/')
+  library(readr)
+}
+
 if(!require(stringr)){
   install.packages(pkgs = 'stringr', repos = 'https://stat.ethz.ch/CRAN/')
   library(stringr)

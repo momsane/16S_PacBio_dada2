@@ -23,7 +23,6 @@ conda activate R # Activate Conda env
 root=/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees
 db1="$root"/data/databases/syncom_custom_db_toSpecies_trainset.fa
 db2="$root"/data/databases/syncom_custom_db_addSpecies.fa
-clusters="$root"/workflow/config/all_16S_cd-hit_clusters_tax_full.tsv
 rarefy_to=-1 # -1 means no rarefaction; use the rarefaction curves to set this value to a relevant number if needed
 facet_var=SampleType
 
@@ -41,7 +40,6 @@ echo input.asvs: "$asvs"
 echo input.metadata: "$metadata"
 echo db1: "$db1"
 echo db2: "$db2"
-echo clusters_tax: "$clusters"
 echo rarefy_to: "$rarefy_to"
 echo facet_var: "$facet_var"
 echo out.tax: "$out_tax"
@@ -54,7 +52,6 @@ Rscript --vanilla "$script" \
     "$metadata" \
     "$db1" \
     "$db2" \
-    "$clusters" \
     "$rarefy_to" \
     "$facet_var" \
     "$out_tax" \
