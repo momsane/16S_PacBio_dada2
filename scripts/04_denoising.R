@@ -190,7 +190,7 @@ cat("Generating rarefaction curves\n")
 
 # using iNEXT so I can also estimate the sampling coverage
 dt <- iNEXT(
-  t(ASV_samples_table_noChim),
+  t(ASV_samples_table_noChim), # samples must be as columns
   q = 0,
   datatype = "abundance",
   endpoint = maxraref,
@@ -201,18 +201,19 @@ dt <- iNEXT(
 )
 
 inextqd <- dt$iNextEst$size_based %>%
-  dplyr::rename(sample = Assemblage)
+  dplyr::rename(SampleID = Assemblage)
 
 sc.plot <- ggplot(
   inextqd[inextqd$Method != "Extrapolation", ],
   aes(
     x = m,
     y = SC,
-    group = sample
+    group = SampleID
   )
 ) +
   geom_vline(aes(xintercept = min(inextqd$m[inextqd$Method == "Observed"]), color = "low"), linetype = "dashed") + # sample with lowest number of reads
   geom_vline(aes(xintercept = max(inextqd$m[inextqd$Method == "Observed"]), color = "high"), linetype = "dashed") + # sample with highest number of reads
+  geom_hline(yintercept = 0.95, linetype = "dashed", color = "grey80") +
   scale_color_manual(name = "", values = c(low = "#669bbc", high = "#e76f51"), labels = c(low = "Lowest depth", high = "Highest depth")) +
   geom_line(alpha = 0.4) +
   geom_ribbon(
@@ -237,7 +238,7 @@ qd.plot <- ggplot(
   aes(
     x = m,
     y = qD,
-    group = sample
+    group = SampleID
   )
 ) +
   geom_vline(aes(xintercept = min(inextqd$m[inextqd$Method == "Observed"]), color = "low"), linetype = "dashed") + # sample with lowest number of reads
@@ -255,7 +256,7 @@ qd.plot <- ggplot(
     aes(
       x = m,
       y = qD,
-      label = sample
+      label = SampleID
     ), size = 4, nudge_x = 70
   ) +
   theme_bw() +
@@ -269,8 +270,8 @@ qd.plot <- ggplot(
     legend.background = element_rect(fill=alpha('white', 0.4))
   )
 
-ggsave(file.path(out.plots, "04_sampling_coverage.pdf"), sc.plot, device="pdf", width = 8, height = 6)
-ggsave(file.path(out.plots, "04_rarefaction_curves.pdf"), qd.plot, device="pdf", width = 10, height = 8)
+ggsave(file.path(out.plots, "04_sampling_coverage_ASVs.pdf"), sc.plot, device="pdf", width = 8, height = 6)
+ggsave(file.path(out.plots, "04_rarefaction_curves_ASVs.pdf"), qd.plot, device="pdf", width = 10, height = 8)
 
 write.table(
   inextqd,

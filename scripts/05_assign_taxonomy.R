@@ -121,7 +121,7 @@ if (rarefy_to == -1){
   ASV_samples_table_noChim2 <- ASV_samples_table_noChim
 } else {
   # rarefy reads
-  cat(paste0("Rarefaction to ", rarefy_to, " reads; sample with fewer reads will be kept as is; ASVs with a subsequent total abundance of 0 will be removed\n"))
+  cat(paste0("Rarefaction to ", rarefy_to, " reads; samples with fewer reads will be kept as is; ASVs with a subsequent total abundance of 0 will be removed\n"))
   set.seed(42)
   raref <- Rarefy(ASV_samples_table_noChim, depth = rarefy_to)
   ASV_samples_table_noChim2 <- raref$otu.tab.rff 
