@@ -37,18 +37,19 @@ if(!require(iNEXT)){
 
 args <- commandArgs(trailingOnly = TRUE)
 
-if (length(args) != 9){
-  stop(" Usage: 04_denoising.R <processed_reads_dir> <read_count_table> <max_reads_derep> <error_model> <max_bases_errormodel> <removeSingletons_T_F> <max_reads_raref> <denoise_results_dir> <plots_dir>", call.=FALSE)
+if (length(args) != 10){
+  stop(" Usage: 04_denoising.R <processed_reads_dir> <read_count_table> <max_reads_derep> <error_model> <max_bases_errormodel> <detectSingletons_T_F> <pool_T_F> <max_reads_raref> <denoise_results_dir> <plots_dir>", call.=FALSE)
 } else {
   input.reads <- args[1] # folder with all pre-processed reads
   input.readcounts <- args[2] # table reporting the number of reads at each step
   maxReads <- args[3] # max number of reads to load at once for dereplication
   errModel <- args[4] # dada2-provided function to estimate the error model
   maxBases <- args[5] # max number of bases to use for error model inference
-  removeSingletons <- args[6] # "T" or "F", whether to remove singletons during denoising or not
-  maxraref <- args[7] # maximum number of reads to extrapolate rarefaction curves
-  out.denois <- args[8] # folder to write denoising results
-  out.plots <- args[9] # folder to write plots
+  detectSingletons <- args[6] # "T" or "F", whether to keep singletons during denoising or not
+  pool <- args[7] # "T" or "F", whether to pool samples for AVS inference (less efficient but more sensitive)
+  maxraref <- args[8] # maximum number of reads to extrapolate rarefaction curves
+  out.denois <- args[9] # folder to write denoising results
+  out.plots <- args[10] # folder to write plots
 }
 
 # input.reads <- "/Volumes/D2c/mgarcia/20240708_mgarcia_syncom_invivo/exp01_inoculation_methods/pacbio_analysis/results/preprocessing/trimmed_filtered_reads"
@@ -56,7 +57,8 @@ if (length(args) != 9){
 # maxReads <- 1E6
 # errModel <- "binnedQualErrfun" # or binnedQualErrfun
 # maxBases <- 1E10
-# removeSingletons <- "F"
+# detectSingletons <- "F"
+# pool <- "F"
 # maxraref <- 5000
 # out.denois <- "/Volumes/D2c/mgarcia/20240708_mgarcia_syncom_invivo/exp01_inoculation_methods/pacbio_analysis/results/denoising"
 # out.plots <- "/Volumes/D2c/mgarcia/20240708_mgarcia_syncom_invivo/exp01_inoculation_methods/pacbio_analysis/plots"
@@ -131,23 +133,36 @@ cat("Error model built\n")
 
 cat("Denoising into ASVs\n")
 
-dds <- list()
-
-if (removeSingletons == "F"){
-  cat("Singleton detection OFF\n")
-  for(i in seq_along(dereps)) {
-    file = names(dereps)[i]
-    cat(paste0("Processing:", file, "\n"))
-    dds[[file]] <- dada(dereps[i], err=error_model, DETECT_SINGLETONS=FALSE, multithread=TRUE, verbose = T) # may leave singletons after merging
+run_dada_single <- function(dereplicated_seqs, error_model = error_model, detectSingletons = detectSingletons){
+  if (detectSingletons == "F"){
+    return(dada(dereplicated_seqs, err=error_model, DETECT_SINGLETONS=FALSE, multithread=TRUE, verbose = T))
+  }
+  if (detectSingletons == "T"){
+    return(dada(dereplicated_seqs, err=error_model, DETECT_SINGLETONS=TRUE, multithread=TRUE, verbose = T))
   }
 }
 
-if (removeSingletons == "T"){
-  cat("Singleton detection ON\n")
-  for(i in seq_along(dereps)) {
+if (pool == "F"){
+  if (detectSingletons == "F"){
+    cat("Singleton detection OFF\n")
+  } else if (detectSingletons == "T"){
+    cat("Singleton detection ON\n")
+  }
+  dds <- list()
+  for (i in seq_along(dereps)) {
     file = names(dereps)[i]
     cat(paste0("Processing:", file, "\n"))
-    dds[[file]] <- dada(dereps[i], err=error_model, DETECT_SINGLETONS=TRUE, multithread=TRUE, verbose = T) # removes any singletons
+    dds[[file]] <- run_dada_single(dereplicated_seqs = dereps[i])
+  }
+}
+
+if (pool == "T"){
+  if (detectSingletons == "F"){
+    cat("Singleton detection OFF\n")
+    dds <- dada(dereps, err=error_model, pool=TRUE, DETECT_SINGLETONS=FALSE, multithread=TRUE, verbose = T)
+  } else if (detectSingletons == "T"){
+    cat("Singleton detection ON\n")
+    dds <- dada(dereps, err=error_model, pool=TRUE, DETECT_SINGLETONS=TRUE, multithread=TRUE, verbose = T)
   }
 }
 
@@ -197,7 +212,7 @@ dt <- iNEXT(
   knots = 50,
   se = TRUE,
   conf = 0.95,
-  nboot = 100
+  nboot = 50
 )
 
 inextqd <- dt$iNextEst$size_based %>%

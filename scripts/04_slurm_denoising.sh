@@ -24,7 +24,8 @@ root=/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees
 errModel=binnedQualErrfun # use `binnedQualErrfun` for Revio data, or `PacBioErrfun` for Sequel data
 maxReads=1000000 # change only if memory issues arise
 maxBases=10000000000 # 1E10 strongly recommended
-removeSingletons=F # option for the dada function
+detectSingletons=F # option for the dada function, if T then sequences found less than twice are kept as ASVs (not recommended)
+pool=F # option for the dada function, set to T if you expect similar composition across samples (e.g. a syncom)
 maxraref=3000 # use the multiqc output to set this value close to the max number of reads in a sample
 
 # do not modify below this line
@@ -42,7 +43,8 @@ echo input.readcounts: "$readcounts"
 echo maxReads: "$maxReads"
 echo errModel: "$errModel"
 echo maxBases: "$maxBases"
-echo removeSingletons: "$removeSingletons"
+echo detectSingletons: "$detectSingletons"
+echo pool: "$pool"
 echo maxraref: "$maxraref"
 echo out.denois: "$out_denois"
 echo out.plots: "$out_plots"
@@ -55,7 +57,8 @@ Rscript --vanilla "$script" \
     "$maxReads" \
     "$errModel" \
     "$maxBases" \
-    "$removeSingletons" \
+    "$detectSingletons" \
+    "$pool" \
     "$maxraref" \
     "$out_denois" \
     "$out_plots"
