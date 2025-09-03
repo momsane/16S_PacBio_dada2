@@ -55,7 +55,7 @@ if (length(args) != 10){
 # input.reads <- "/Volumes/D2c/mgarcia/20240708_mgarcia_syncom_invivo/exp01_inoculation_methods/pacbio_analysis/results/preprocessing/trimmed_filtered_reads"
 # input.readcounts <- "/Volumes/D2c/mgarcia/20240708_mgarcia_syncom_invivo/exp01_inoculation_methods/pacbio_analysis/results/preprocessing/read_count_before_after.tsv"
 # maxReads <- 1E6
-# errModel <- "binnedQualErrfun" # or binnedQualErrfun
+# errModel <- "binnedQualErrfun"
 # maxBases <- 1E10
 # detectSingletons <- "F"
 # pool <- "F"
@@ -88,12 +88,21 @@ dereps <- derepFastq(filtered_trimmed_reads_paths, verbose=TRUE, n = maxReads)
 cat("Dereplication done\n")
 
 
-
 ### Build error model ###
 
 cat("Building error model\n")
 
 set.seed(42)
+
+# sample quality scores from 5 random samples to check whether they are binned or not
+quals <- c()
+for (file in sample(filtered_trimmed_reads_paths, 5, replace = F)){
+  quals <- unique(append(quals, unique(plotQualityProfile(file)$data$Score)))
+}
+
+cat("Quality scores detected in the trimmed and filtered reads:\n")
+cat(sort(quals))
+cat("\n")
 
 if (errModel == "binnedQualErrfun"){
   cat("Building error model with bins [3, 10, 17, 22, 27, 35, 40]\n")
@@ -128,21 +137,23 @@ saveRDS(error_model, file.path(out.denois, "dada2_error_model.RDS"))
 
 cat("Error model built\n")
 
+# error_model <- readRDS(file = file.path(out.denois, "dada2_error_model.RDS"))
 
 ### ASV inference ###
 
 cat("Denoising into ASVs\n")
 
-run_dada_single <- function(dereplicated_seqs, error_model = error_model, detectSingletons = detectSingletons){
-  if (detectSingletons == "F"){
-    return(dada(dereplicated_seqs, err=error_model, DETECT_SINGLETONS=FALSE, multithread=TRUE, verbose = T))
+run_dada_single <- function(dereplicated_seqs, errM = error_model, singlt = detectSingletons){
+  if (singlt == "F"){
+    return(dada(dereplicated_seqs, err=errM, DETECT_SINGLETONS=FALSE, multithread=TRUE, verbose = T))
   }
-  if (detectSingletons == "T"){
-    return(dada(dereplicated_seqs, err=error_model, DETECT_SINGLETONS=TRUE, multithread=TRUE, verbose = T))
+  if (singlt == "T"){
+    return(dada(dereplicated_seqs, err=errM, DETECT_SINGLETONS=TRUE, multithread=TRUE, verbose = T))
   }
 }
 
 if (pool == "F"){
+  cat("No pooling\n")
   if (detectSingletons == "F"){
     cat("Singleton detection OFF\n")
   } else if (detectSingletons == "T"){
@@ -154,9 +165,8 @@ if (pool == "F"){
     cat(paste0("Processing:", file, "\n"))
     dds[[file]] <- run_dada_single(dereplicated_seqs = dereps[i])
   }
-}
-
-if (pool == "T"){
+} else if (pool == "T"){
+  cat("Pooling\n")
   if (detectSingletons == "F"){
     cat("Singleton detection OFF\n")
     dds <- dada(dereps, err=error_model, pool=TRUE, DETECT_SINGLETONS=FALSE, multithread=TRUE, verbose = T)
@@ -175,7 +185,7 @@ cat("Denoising done\n")
 
 cat("Generating ASV table\n")
 
-#dds <- readRDS(file = file.path(out.denois, "denoised_seqs.rds"))
+# dds <- readRDS(file = file.path(out.denois, "denoised_seqs.rds"))
 ASV_samples_table <- makeSequenceTable(dds)
 
 cat(paste0("Found ", ncol(ASV_samples_table), " ASVs across the ", nrow(ASV_samples_table), " samples", "\n"))

@@ -168,31 +168,6 @@ filtering_summary <- filtering_summary %>%
 
 cat("Trimming and filtering reads done\n")
 
-# ### Experimental: collect reads that were filtered out and plot quality ###
-# 
-# dir.create(file.path(out.preproc, "reads_filtered_out"), recursive = TRUE, showWarnings = FALSE)
-# 
-# fout_reads_paths <- file.path(out.preproc, "reads_filtered_out", basename(raw_reads_paths))
-# 
-# i <- 24
-# sample <- sub(".fastq.gz", "", basename(trimmed_reads_paths[i]))
-# pf_file <- trimmed_reads_paths[i]
-# pf_reads <- ShortRead::readFastq(pf_file)
-# filt_file <- filtered_trimmed_reads_paths[i]
-# filt_reads <- ShortRead::readFastq(filt_file)
-# pf_headers <- as.character(ShortRead::id(pf_reads))
-# filt_headers <- as.character(ShortRead::id(filt_reads))
-# rm <- setdiff(pf_headers, filt_headers)
-# 
-# keep_idx <- pf_headers %in% rm
-# subset <- pf_reads[keep_idx]
-# ShortRead::writeFastq(subset, fout_reads_paths[i])
-# 
-# quals1 <- plotQualityProfile(fout_reads_paths[i])
-# quals2 <- plotQualityProfile(filtered_trimmed_reads_paths[i])
-# ggsave(file.path(out.preproc, "reads_filtered_out", paste0("quals_rm_", sample, ".pdf")), quals1, device = "pdf")
-# ggsave(file.path(out.preproc, "reads_filtered_out", paste0("quals_kept_", sample, ".pdf")), quals2, device = "pdf")
-
 ### Summary stats on number of reads and read length ###
 
 cat("Computing read statistics\n")

@@ -21,7 +21,7 @@ conda activate R # Activate Conda env
 
 # Variables to modify
 root=/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees
-errModel=binnedQualErrfun # use `binnedQualErrfun` for Revio data, or `PacBioErrfun` for Sequel data
+errModel=binnedQualErrfun # use `binnedQualErrfun` if you have binned quality score, or else `PacBioErrfun`
 maxReads=1000000 # change only if memory issues arise
 maxBases=10000000000 # 1E10 strongly recommended
 detectSingletons=F # option for the dada function, if T then sequences found less than twice are kept as ASVs (not recommended)

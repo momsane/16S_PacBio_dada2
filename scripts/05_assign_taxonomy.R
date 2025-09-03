@@ -86,16 +86,20 @@ if (length(args) != 8){
   out.plots <- args[8] # folder to write plots
 }
 
-# root <- "/Volumes/D2c/mgarcia/20240708_mgarcia_syncom_invivo/exp01_inoculation_methods/pacbio_analysis/run1_bees"
-# # root <- "/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees"
+# root <- "/Users/mgarci14/Desktop/SAGE_2025_dataset"
 # input.asvs <- file.path(root, "results", "denoising", "ASV_samples_table_noChim.rds")
 # input.metadata <- file.path(root, "workflow", "config", "metadata.tsv")
-# db1 <- file.path(root, "data", "databases", "amplicon_based_db", "syncom_custom_db_toSpecies_trainset.fa")
-# db2 <- file.path(root, "data", "databases", "amplicon_based_db", "syncom_custom_db_addSpecies.fa")
+# db1 <- file.path(root, "data", "databases", "silva_nr99_v138.2_toSpecies_trainset.fa")
+# db2 <- ""
 # rarefy_to <- -1
-# facet_var <- "SampleType"
+# facet_var <- "Species"
 # out.tax <- file.path(root, "results", "assign_taxonomy")
 # out.plots <- file.path(root, "plots")
+
+if (facet_var %in% c("Domain", "Phylum", "Class", "Family", "Order", "Genus", "Species")){
+  cat("Error: the provided facet_var is conflicting with taxonomic rank names! Please change the name of this variable before continuing.\n")
+  quit(save="no")
+}
 
 ### Create outdirs ###
 
@@ -111,8 +115,6 @@ rarefy_to <- as.numeric(rarefy_to)
 ASV_samples_table_noChim <- readRDS(input.asvs)
 meta <- as.data.frame(read_tsv(input.metadata, show_col_types = F))
 rownames(meta) = meta$SampleID
-
-#clusters <- read.table(input.clusters, sep = "\t", header = T)
 
 ### Rarefy reads if needed ###
 
@@ -203,8 +205,7 @@ addSpecies_custom <- function(seqs, refFasta) {
 
 if (db2 != ""){
   cat(paste0("Using database ", db2, " to assign species\n"))
-  ASV_taxonomy2 <- addSpecies_custom(seqs = ASV_samples_table_noChim2, refFasta = db2)
-  ASV_taxonomy2 <- ASV_taxonomy2 %>% 
+  ASV_taxonomy2 <- addSpecies_custom(seqs = ASV_samples_table_noChim2, refFasta = db2) %>% 
     separate(ref_match, into = c("Species_addSp", "Strain", "Cluster"), sep = "-", remove = T) %>% 
     separate(Species_addSp, into = c("Genus_addSp", "Species_addSp"), sep = " ") %>% 
     select(-"ASV_index")
@@ -212,25 +213,26 @@ if (db2 != ""){
   # merge with taxonomy from assignTaxonomy()
   ASV_taxonomy3 <- transform(merge(ASV_taxonomy,ASV_taxonomy2,by=0,all=TRUE), row.names=Row.names, Row.names=NULL)
   
+  # remove all prefixes (used in gg2)
+  ASV_taxonomy3[,colnames(ASV_taxonomy3)] <- lapply(
+    ASV_taxonomy3[,colnames(ASV_taxonomy3)],
+    gsub,
+    pattern = "d__|p__|c__|o__|f__|g__|s__",
+    replacement = ""
+  )
+  
   # combine taxonomy from both functions
   ASV_taxonomy3 <- ASV_taxonomy3 %>% 
-    separate("Genus", into = c(NA,"Genus_clean"), sep = "g__", remove = F) %>% 
-    separate("Species", into = c(NA,"Species_clean"), sep = "s__", remove = F) %>% 
-    mutate(Genus_clean = if_else(!is.na(Genus_addSp),Genus_addSp,Genus_clean)) %>% # overwriting genus with genus from addSpecies if there is a hit
-    mutate(Species_clean = case_when(
-      !is.na(Genus_addSp) ~ Species_addSp,
-      is.na(Genus_addSp) & !is.na(Genus_clean) ~ Species_clean,
-      is.na(Genus_addSp) & is.na(Genus_clean) ~ Species_clean,
-    )) %>% # overwriting species with species from addSpecies if there is a hit
+    mutate(Genus = if_else(!is.na(Genus_addSp),Genus_addSp,Genus)) %>% # overwriting genus with genus from addSpecies if there is a hit
+    mutate(Species = if_else(!is.na(Genus_addSp),Species_addSp,Species)) %>% # overwriting species with species from addSpecies if there is a hit
     mutate(Species_full = case_when(
-      is.na(Genus_clean) ~ "s__",
-      !is.na(Genus_clean) & is.na(Species_clean) ~ paste("s__", Genus_clean, " sp.", sep = ""),
-      !is.na(Genus_clean) & !is.na(Species_clean) ~ paste("s__", Genus_clean, " ", Species_clean, sep = "")
+      is.na(Genus) ~ NA,
+      !is.na(Genus) & is.na(Species) ~ paste(Genus, " sp.", sep = ""),
+      !is.na(Genus) & !is.na(Species) ~ paste(Genus, " ", Species, sep = "")
     )) %>% # rewrite full species name
-    dplyr::select(-c("Species", "Species_clean", "Genus", "Genus_addSp", "Species_addSp")) %>%
-    dplyr::rename(Genus = Genus_clean) %>% 
-    dplyr::rename(Species = Species_full) %>% 
-    dplyr::relocate("Species", .after = "Genus") %>%
+    dplyr::select(-c("Genus_addSp", "Species", "Species_addSp")) %>%
+    dplyr::rename(Species = Species_full) %>%
+    relocate(Species, .before = "Strain") %>% 
     mutate(inferred_from = if_else(is.na(Cluster), "assignTaxonomy", "addSpecies_custom")) %>%
     arrange(Species)
   
@@ -241,17 +243,28 @@ if (db2 != ""){
   if (!("Species" %in% colnames(ASV_taxonomy3))){
     ASV_taxonomy3$Species <- NA
   }
-  ASV_taxonomy3 <- ASV_taxonomy3 %>% 
-    mutate(Species2 = if_else(!is.na(Species), paste(Genus, Species),NA)) %>%
-    dplyr::select(-c(Species)) %>% 
-    dplyr::rename(Species = Species2) %>%
+  
+  # remove all prefixes (used in gg2)
+  ASV_taxonomy3[,colnames(ASV_taxonomy3)] <- lapply(
+    ASV_taxonomy3[,colnames(ASV_taxonomy3)],
+    gsub,
+    pattern = "d__|p__|c__|o__|f__|g__|s__",
+    replacement = ""
+  )
+  
+  ASV_taxonomy3 <- ASV_taxonomy3 %>%
+    mutate(Species_full = case_when(
+      is.na(Genus) ~ NA,
+      !is.na(Genus) & is.na(Species) ~ paste(Genus, " sp.", sep = ""),
+      !is.na(Genus) & !is.na(Species) ~ paste(Genus, " ", Species, sep = "")
+    )) %>% # rewrite full species name
+    dplyr::select(-c("Species")) %>%
+    dplyr::rename(Species = Species_full) %>%
     mutate(Strain = NA) %>%
     mutate(Cluster = NA) %>%
-    mutate(inferred_from = "assignTaxonomy")
+    mutate(inferred_from = "assignTaxonomy") %>% 
+    arrange(Species)
 }
-
-ASV_taxonomy4 <- ASV_taxonomy3 %>% 
-  mutate(ASV = rownames(ASV_taxonomy3), .before = "Kingdom")
 
 cat("Finished assigning taxonomy\n")
 
@@ -270,8 +283,7 @@ ASV_taxonomy3 <- ASV_taxonomy3 %>%
     is.na(Genus) ~ Family,
     is.na(Species) ~ Genus,
   )) %>%
-  mutate(Species = if_else((Species %in% c("s__", "") | is.na(Species)), paste(lowest_assign_taxon, "sp."),Species)) %>% 
-  mutate(Species = gsub("d__|p__|c__|o__|f__|g__", "s__", Species)) %>% 
+  mutate(Species = if_else((Species == "" | is.na(Species)), paste(lowest_assign_taxon, "sp."),Species)) %>% 
   dplyr::select(-"lowest_assign_taxon")
 
 
@@ -303,14 +315,14 @@ cat(paste0("Represented domains: ", paste0(unique(ASV_taxonomy3$Kingdom), collap
 cat(paste0("Represented classes: ", paste0(sort(unique(ASV_taxonomy3$Class)), collapse = ", "), "\n"))
 
 # remove non-bacterial ASVs
-ps <- subset_taxa(ps, Kingdom %in% c("d__Bacteria", "Bacteria", "k__Bacteria") | is.na(Kingdom))
-ps <- subset_taxa(ps, !(Class %in% c("c__Chloroplast", "Chloroplast")) | is.na(Class))
-ps <- subset_taxa(ps, !(Order %in% c("c__Chloroplast", "Chloroplast")) | is.na(Order))
-ps <- subset_taxa(ps, !(Family %in% c("f__Mitochondria", "Mitochondria")) | is.na(Family))
+ps <- subset_taxa(ps, Kingdom == "Bacteria" | is.na(Kingdom))
+ps <- subset_taxa(ps, !(Class == "Chloroplast") | is.na(Class))
+ps <- subset_taxa(ps, !(Order == "Chloroplast") | is.na(Order))
+ps <- subset_taxa(ps, !(Family == "Mitochondria") | is.na(Family))
 
-cat(paste0("Found and removed ", length(which(!(ASV_taxonomy[,1] %in% c("d__Bacteria", "Bacteria", "k__Bacteria")))), " non-bacterial ASV(s)\n"))
-cat(paste0("Found and removed ", length(which(ASV_taxonomy[,3] %in% c("c__Chloroplast", "Chloroplast")))+length(which(ASV_taxonomy[,4] %in% c("c__Chloroplast", "Chloroplast"))), " chloroplast ASV(s)\n"))
-cat(paste0("Found and removed ", length(which(ASV_taxonomy[,5] %in% c("f__Mitochondria", "Mitochondria"))), " mitochondrial ASV(s)\n"))
+cat(paste0("Found and removed ", length(which(!(ASV_taxonomy[,1] == "Bacteria"))), " non-bacterial ASV(s)\n"))
+cat(paste0("Found and removed ", length(which(ASV_taxonomy[,3] == "Chloroplast"))+length(which(ASV_taxonomy[,4] == "Chloroplast")), " chloroplast ASV(s)\n"))
+cat(paste0("Found and removed ", length(which(ASV_taxonomy[,5] == "Mitochondria")), " mitochondrial ASV(s)\n"))
 
 # save sequences and give new names to ASVs
 dna <- DNAStringSet(taxa_names(ps))
@@ -323,15 +335,18 @@ names(dna) <- taxa_names(ps)
 
 # write as fasta
 writeXStringSet(dna, file.path(out.tax, "ASVs_dada2.fasta"))
+
 # write as df with taxonomy
 dna_df <- data.frame(
   seq = dna
 ) %>% 
   merge(tax_table(ps), by=0) %>% 
   dplyr::rename(ASV = Row.names)
+
 write.table(dna_df, file.path(out.tax, "ASV_name_tax.tsv"), sep = "\t", col.names = T, row.names = F, quote = F)
 
 saveRDS(object = ps, file = file.path(out.tax, "phyloseq_object.RDS"))
+
 # ps <- readRDS(file.path(out.tax, "phyloseq_object.RDS"))
 
 cat("Finished creating and filtering phyloseq object\n")

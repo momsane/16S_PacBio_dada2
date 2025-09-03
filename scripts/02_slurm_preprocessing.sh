@@ -27,7 +27,7 @@ fwd_primer=AGRGTTYGATYMTGGCTCAG
 rev_primer=RGYTACCTTGTTACGACTT
 minLen=1400
 maxLen=1600
-maxEE=3 # use 2 for normal PacBio, 3 for Kinnex
+maxEE=3 # use 2 for 'normal' PacBio libraries, 3 for Kinnex libraries
 
 # do not modify below this line
 script="$root"/workflow/scripts/02_preprocessing.R

@@ -9,6 +9,8 @@ name_table=/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/workflow
 # make sure to add an empty line at the bottom, otherwise the last file won't be processed
 # make sure the table is in Unix format! use dos2unix to convert it if necessary
 
+mkdir -p "$path_to_cluster"
+
 # copy and rename files
 while read -r oldname newname; do
     cp "$path_to_nas"/"$oldname" "$path_to_cluster"/"$newname"

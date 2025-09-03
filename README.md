@@ -1,20 +1,20 @@
 # Analysis of 16S PacBio data with dada2
 
 
+Table of contents
 
-- Table of contents
-    - [Running the dada2 pipeline](#running-the-dada2-pipeline)
-        - [Overview](#adapting-the-scripts)
-        - [Requirements](#adapting-the-scripts)
-        - [Setting up the work environment](#setting-up-the-work-environment)
-        - [Data preparation](#data-preparation)
-        - [Adapting the scripts](#adapting-the-scripts)
-        - [Running the pipeline](#running-the-pipeline)
-    - [Custom database for defined communities](#creating-a-custom-database-for-defined-communities)
-        - [Install required tools](#install-required-tools)
-        - [Merging and dereplicating 16S sequences](#merging-and-dereplicating-16s-sequences)
-        - [Formatting databases for dada2](#formatting-databases-for-dada2)
-        - [Comparing and merging databases](#comparing-and-merging-databases)
+- [Running the dada2 pipeline](#running-the-dada2-pipeline)
+    - [Overview](#adapting-the-scripts)
+    - [Requirements](#adapting-the-scripts)
+    - [Setting up the work environment](#setting-up-the-work-environment)
+    - [Data preparation](#data-preparation)
+    - [Adapting the scripts](#adapting-the-scripts)
+    - [Running the pipeline](#running-the-pipeline)
+- [Custom database for defined communities](#creating-a-custom-database-for-defined-communities)
+    - [Install required tools](#install-required-tools)
+    - [Merging and dereplicating 16S sequences](#merging-and-dereplicating-16s-sequences)
+    - [Formatting databases for dada2](#formatting-databases-for-dada2)
+    - [Comparing and merging databases](#comparing-and-merging-databases)
 
 ---
 
@@ -34,6 +34,7 @@ The pipeline consists of a few main steps:
 - denoising into ASVs with dada2 `04_slurm_denoising.sh`
 - taxonomy assignment with dada2 `05_slurm_assign_taxonomy.sh`
 - *(only for defined communities)* compute strain abundance from ASV table `06_slurm_quantify_strains.sh`.
+
 dada2 is implemented in Rscripts called by the bash scripts. **There should not be any need to modify the R scripts**.
 
 ### Requirements
@@ -53,7 +54,8 @@ Set up your working directory:
 ```
 .
 ├── data
-    └── raw_reads
+    ├── raw_reads
+    └── databases
 ├── logs
 ├── plots
 ├── results
@@ -83,10 +85,10 @@ Before running the pipeline, you need to prepare some data. It is important that
 
 ### Adapting the scripts
 
-Only the `.sh` scripts need to be modified. You will need to modify the beginning of these scripts:
+Only the `.sh` scripts need to be modified. You will need to modify only the beginning of these scripts:
 
-- modify the commands to initialize conda according to the type of installation you are using
-- modify the input variables, for instance the path to the root directory
+- the commands to initialize conda according to the type of installation you are using
+- the input variables, for instance the path to the root directory
 - the pre-rarefaction and the fastQC scripts are array jobs (argument `--array` in the slurm header), so you need to modify the range of the arrays. `2-50` means you will process files described in lines 2 to 50 of `config/metadata.tsv`. We start at 2 to skip the header. So your array range should be `2-<number of samples>+1`
 - you should not need to modify the resource requirements, unless your jobs get killed.
 
@@ -104,7 +106,7 @@ To run each script:
 | `00_rarefy.sh`        | Size of output fastQ files is > 0                            |
 | `01_fastqc_preproc.sh` & `03_fastqc_postproc.sh`      | Output folders are not empty                            |
 | `01_multiqc_preproc.sh` & `03_multiqc_postproc.sh`            | Look at HTML report                  |
-| `02_slurm_preprocessing.sh`            | Check for errors in log; check number of fastQ files in results/preprocessing/primerfree_reads & results/preprocessing/trimmed_filtered_reads; check output plot                  |
+| `02_slurm_preprocessing.sh`            | Check for errors in log; check number of fastQ files in results/preprocessing/primerfree_reads & results/preprocessing/trimmed_filtered_reads; check output plots                  |
 | `04_slurm_denoising.sh`            | Check for errors in log; check output plots                  |
 | `05_slurm_assign_taxonomy.sh`            | Check for errors in log; check output plots                  |
 | `06_slurm_quantify_strains.sh`            | Check for errors in log; check output plots                  |
@@ -112,7 +114,7 @@ To run each script:
 
 **Note 1:** the first time you run `02_slurm_preprocessing.sh` and `05_slurm_assign_taxonomy.sh`, some R packages will be installed. The execution might be halted with an error message after the last installation. This is because the R environment needs to be reloaded. Simply run the script again and it should work.
 
-**Note 2:** to run `06_slurm_quantify_strains.sh`, you first need to create your custom database (see below) and run `05_slurm_assign_taxonomy.sh` with this custom database as `db2`.
+**Note 2:** to use `06_slurm_quantify_strains.sh`, you first need to create your custom database (see below) and run `05_slurm_assign_taxonomy.sh` with this custom database as `db2`.
 
 ---
 

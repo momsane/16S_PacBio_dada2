@@ -55,7 +55,7 @@ if (length(args) != 7){
 # input.clusters <- file.path(root, "workflow", "config", "all_16S_cd-hit_clusters_tax_full.tsv")
 # input.metadata <- file.path(root, "workflow", "config", "metadata.tsv")
 # facet_var <- "SampleType"
-# maxraref <- 3000
+# maxraref <- 2500
 # out.quant <- file.path(root, "results", "quantify_strains")
 # out.plots <- file.path(root, "plots")
 
@@ -268,7 +268,7 @@ dt <- iNEXT(
   knots = 50,
   se = TRUE,
   conf = 0.95,
-  nboot = 100
+  nboot = 50
 )
 
 inextqd <- dt$iNextEst$size_based %>%
