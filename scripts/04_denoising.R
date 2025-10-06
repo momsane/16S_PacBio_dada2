@@ -153,7 +153,6 @@ run_dada_single <- function(dereplicated_seqs, errM = error_model, singlt = dete
 }
 
 if (pool == "F"){
-  cat("No pooling\n")
   if (detectSingletons == "F"){
     cat("Singleton detection OFF\n")
   } else if (detectSingletons == "T"){
@@ -166,7 +165,6 @@ if (pool == "F"){
     dds[[file]] <- run_dada_single(dereplicated_seqs = dereps[i])
   }
 } else if (pool == "T"){
-  cat("Pooling\n")
   if (detectSingletons == "F"){
     cat("Singleton detection OFF\n")
     dds <- dada(dereps, err=error_model, pool=TRUE, DETECT_SINGLETONS=FALSE, multithread=TRUE, verbose = T)

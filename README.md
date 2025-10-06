@@ -20,14 +20,18 @@ Table of contents
 
 ## Running the dada2 pipeline
 
-**Important note**: this pipeline should be executed independently for separate runs, as the error profile is unique to each run.
+**Important note 1**: this pipeline should be executed independently for separate runs, as the error profile is unique to each run.
+
+**Important note 2**: depending on the type of library you have and how the fastQ files were produced, you need to select between different options for the filtering and denoising steps. 
+- Consensus sequences from a Kinnex library have less passes, therefore the quality is lower. I would recommend using maxEE=3 to avoid being too strict.
+- The CSS software used to infer consensus sequences bins the quality scores to reduce file size, see [here](https://ccs.how/faq/qv-binning.html). If you have such binned quality scores, you need to choose the appropriate function for the `learnErrors` function. 
 
 ### Overview
 
-The pipeline consists of a few main steps:
+Steps of the pipeline:
 
 - copy and rename raw reads files with sample ID if needed `copy_rename_files.sh`
-- *(optional step)* pre-rarefaction of the reads for large samples `00_rarefy.sh`
+- *(optional step)* pre-rarefaction of the reads `00_rarefy.sh`
 - quality check on the raw reads `01_fastqc_preproc.sh` and `01_multiqc_preproc.sh`
 - pre-processing of the reads with dada2 (primer removal, length and quality trimming) `02_slurm_preprocessing.sh`
 - quality check on the processed reads `03_fastqc_postproc.sh` and `03_multiqc_posteproc.sh`

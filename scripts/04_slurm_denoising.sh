@@ -3,7 +3,7 @@
 #SBATCH --account pengel_general_data
 #SBATCH --nodes 1
 #SBATCH --ntasks 1
-#SBATCH --cpus-per-task 2
+#SBATCH --cpus-per-task 4
 #SBATCH --mem 16000
 #SBATCH --partition cpu
 #SBATCH --time 05:00:00
