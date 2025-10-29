@@ -30,6 +30,7 @@ facet_var=SampleType
 script="$root"/workflow/scripts/05_assign_taxonomy.R
 asvs="$root"/results/denoising/ASV_samples_table_noChim.rds
 metadata="$root"/workflow/config/metadata.tsv
+readcounts="$root"/results/denoising/read_counts_steps.tsv
 out_tax="$root"/results/assign_taxonomy
 out_plots="$root"/plots
 
@@ -38,6 +39,7 @@ out_plots="$root"/plots
 echo "Parameters:"
 echo input.asvs: "$asvs"
 echo input.metadata: "$metadata"
+echo input.readcounts: "$readcounts"
 echo db1: "$db1"
 echo db2: "$db2"
 echo rarefy_to: "$rarefy_to"
@@ -50,6 +52,7 @@ echo "Refer to the Rscript for information on the parameters"
 Rscript --vanilla "$script" \
     "$asvs" \
     "$metadata" \
+    "$readcounts" \
     "$db1" \
     "$db2" \
     "$rarefy_to" \

@@ -17,7 +17,7 @@ while read -r oldname newname; do
 done < "$name_table"
 
 # check file names
-echo "Please check file names (first few files):"
-ls "$path_to_cluster" | head
+echo "Please check that file names are correct and do not contain special characters:"
+ls -la "$path_to_cluster"
 
 

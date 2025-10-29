@@ -38,30 +38,31 @@ if(!require(iNEXT)){
 args <- commandArgs(trailingOnly = TRUE)
 
 if (length(args) != 10){
-  stop(" Usage: 04_denoising.R <processed_reads_dir> <read_count_table> <max_reads_derep> <error_model> <max_bases_errormodel> <detectSingletons_T_F> <pool_T_F> <max_reads_raref> <denoise_results_dir> <plots_dir>", call.=FALSE)
+  stop(" Usage: 04_denoising.R <processed_reads_dir> <read_count_table> <max_reads_derep> <error_model> <max_bases_errormodel> <priors_db> <pool_T_F> <max_reads_raref> <denoise_results_dir> <plots_dir>", call.=FALSE)
 } else {
   input.reads <- args[1] # folder with all pre-processed reads
   input.readcounts <- args[2] # table reporting the number of reads at each step
   maxReads <- args[3] # max number of reads to load at once for dereplication
   errModel <- args[4] # dada2-provided function to estimate the error model
   maxBases <- args[5] # max number of bases to use for error model inference
-  detectSingletons <- args[6] # "T" or "F", whether to keep singletons during denoising or not
+  db2 <- args[6] # database of ASVs expected in the samples
   pool <- args[7] # "T" or "F", whether to pool samples for AVS inference (less efficient but more sensitive)
   maxraref <- args[8] # maximum number of reads to extrapolate rarefaction curves
   out.denois <- args[9] # folder to write denoising results
   out.plots <- args[10] # folder to write plots
 }
 
-# input.reads <- "/Volumes/D2c/mgarcia/20240708_mgarcia_syncom_invivo/exp01_inoculation_methods/pacbio_analysis/results/preprocessing/trimmed_filtered_reads"
-# input.readcounts <- "/Volumes/D2c/mgarcia/20240708_mgarcia_syncom_invivo/exp01_inoculation_methods/pacbio_analysis/results/preprocessing/read_count_before_after.tsv"
+# root <- file.path("/Volumes", "D2c", "mgarcia", "20240708_mgarcia_syncom_assembly", "pacbio_analysis", "run1_bees")
+# input.reads <- file.path(root, "results", "preprocessing", "trimmed_filtered_reads")
+# input.readcounts <- file.path(root, "results", "preprocessing", "read_count_before_after.tsv")
 # maxReads <- 1E6
 # errModel <- "binnedQualErrfun"
 # maxBases <- 1E10
-# detectSingletons <- "F"
+# db2 <- file.path(root, "data", "databases", "amplicon_based_db/syncom_custom_db_addSpecies.fa")
 # pool <- "F"
-# maxraref <- 5000
-# out.denois <- "/Volumes/D2c/mgarcia/20240708_mgarcia_syncom_invivo/exp01_inoculation_methods/pacbio_analysis/results/denoising"
-# out.plots <- "/Volumes/D2c/mgarcia/20240708_mgarcia_syncom_invivo/exp01_inoculation_methods/pacbio_analysis/plots"
+# maxraref <- 8000
+# out.denois <- file.path(root, "results", "denoising")
+# out.plots <- file.path(root, "plots")
 
 ### Create outdirs ###
 
@@ -100,7 +101,7 @@ for (file in sample(filtered_trimmed_reads_paths, 5, replace = F)){
   quals <- unique(append(quals, unique(plotQualityProfile(file)$data$Score)))
 }
 
-cat("Quality scores detected in the trimmed and filtered reads:\n")
+cat("Quality scores detected in the trimmed and filtered reads (five randomly chosen samples):\n")
 cat(sort(quals))
 cat("\n")
 
@@ -143,20 +144,27 @@ cat("Error model built\n")
 
 cat("Denoising into ASVs\n")
 
-run_dada_single <- function(dereplicated_seqs, errM = error_model, singlt = detectSingletons){
-  if (singlt == "F"){
-    return(dada(dereplicated_seqs, err=errM, DETECT_SINGLETONS=FALSE, multithread=TRUE, verbose = T))
+# options:
+# pooling ON/OFF
+# priors yes/no
+
+run_dada_single <- function(dereplicated_seqs, errM = error_model, priors_db = db2){
+  # with priors
+  if (priors_db != ""){
+    my_priors <- getSequences(priors_db)
+    return(dada(dereplicated_seqs, err=errM, multithread=TRUE, verbose = T, priors = my_priors))
   }
-  if (singlt == "T"){
-    return(dada(dereplicated_seqs, err=errM, DETECT_SINGLETONS=TRUE, multithread=TRUE, verbose = T))
+  # without priors
+  else {
+    return(dada(dereplicated_seqs, err=errM, multithread=TRUE, verbose = T))
   }
 }
 
 if (pool == "F"){
-  if (detectSingletons == "F"){
-    cat("Singleton detection OFF\n")
-  } else if (detectSingletons == "T"){
-    cat("Singleton detection ON\n")
+  if (db2 == ""){
+    cat("No priors given\n")
+  } else {
+    cat(paste0("Using ", db2, " as priors\n"))
   }
   dds <- list()
   for (i in seq_along(dereps)) {
@@ -165,12 +173,12 @@ if (pool == "F"){
     dds[[file]] <- run_dada_single(dereplicated_seqs = dereps[i])
   }
 } else if (pool == "T"){
-  if (detectSingletons == "F"){
-    cat("Singleton detection OFF\n")
-    dds <- dada(dereps, err=error_model, pool=TRUE, DETECT_SINGLETONS=FALSE, multithread=TRUE, verbose = T)
-  } else if (detectSingletons == "T"){
-    cat("Singleton detection ON\n")
-    dds <- dada(dereps, err=error_model, pool=TRUE, DETECT_SINGLETONS=TRUE, multithread=TRUE, verbose = T)
+  if (db2 == ""){
+    cat("No priors given\n")
+    dds <- dada(dereps, err=error_model, pool=TRUE, multithread=TRUE, verbose = T)
+  } else {
+    cat(paste0("Using ", db2, " as priors\n"))
+    dds <- dada(dereps, err=error_model, pool=TRUE, multithread=TRUE, verbose = T, priors = getSequences(db2))
   }
 }
 
@@ -192,7 +200,12 @@ cat(paste0("Found ", ncol(ASV_samples_table), " ASVs across the ", nrow(ASV_samp
 
 cat("Removing chimera\n")
 
-ASV_samples_table_noChim <- removeBimeraDenovo(ASV_samples_table, verbose = T, multithread = T)
+if (pool == "F"){
+  ASV_samples_table_noChim <- removeBimeraDenovo(ASV_samples_table, verbose = T, multithread = T)
+} else if (pool == "T"){
+  cat("Removing chimera in pooled mode")
+  ASV_samples_table_noChim <- removeBimeraDenovo(ASV_samples_table, method = "pooled", verbose = T, multithread = T)
+}
 
 #clean sample names
 names <- basename(rownames(ASV_samples_table_noChim))
@@ -211,16 +224,22 @@ cat("Chimera removal done\n")
 
 cat("Generating rarefaction curves\n")
 
+# remove zero-abundance samples
+totab <- apply(ASV_samples_table_noChim, 1, sum)
+zeroes <- names(which(totab == 0))
+
+inext_input <- t(ASV_samples_table_noChim[setdiff(names(totab), zeroes),])
+
 # using iNEXT so I can also estimate the sampling coverage
 dt <- iNEXT(
-  t(ASV_samples_table_noChim), # samples must be as columns
+  inext_input, # samples must be as columns
   q = 0,
   datatype = "abundance",
   endpoint = maxraref,
   knots = 50,
   se = TRUE,
   conf = 0.95,
-  nboot = 50
+  nboot = 20
 )
 
 inextqd <- dt$iNextEst$size_based %>%
@@ -387,6 +406,14 @@ reads.plot2 <- ggplot(
 ggsave(file.path(out.plots, "04_read_number_lines.pdf"), reads.plot1, device="pdf", width = 10, height = 8)
 ggsave(file.path(out.plots, "04_read_number_hist.pdf"), reads.plot2, device="pdf", width = 4, height = 8)
 
+write.table(
+  reads_df2,
+  file = file.path(out.denois, "read_counts_steps.tsv"),
+  sep = "\t",
+  quote = F,
+  row.names = F,
+  col.names = T
+)
 
 cat("Finished plotting global statistics\n")
 

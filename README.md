@@ -30,7 +30,7 @@ Table of contents
 
 Steps of the pipeline:
 
-- copy and rename raw reads files with sample ID if needed `copy_rename_files.sh`
+- *(optional step)* copy and rename raw reads files with sample ID if needed `00_copy_rename_files.sh`
 - *(optional step)* pre-rarefaction of the reads `00_rarefy.sh`
 - quality check on the raw reads `01_fastqc_preproc.sh` and `01_multiqc_preproc.sh`
 - pre-processing of the reads with dada2 (primer removal, length and quality trimming) `02_slurm_preprocessing.sh`
@@ -53,7 +53,7 @@ dada2 is implemented in Rscripts called by the bash scripts. **There should not 
 
 Set up your working directory:
 1. Create a folder with the name of your project.
-2. Enter this folder, clone this git using `git clone https://github.com/momsane/16S_PacBio_dada2` then rename the folder `mv 16S_PacBio_dada2 workflow`.
+2. Enter this folder, clone this git using `git clone https://github.com/momsane/16S_PacBio_dada2` then rename the folder with `mv 16S_PacBio_dada2 workflow`.
 3. Create additional folders to obtain the following tree:
 ```
 .
@@ -100,7 +100,9 @@ On top of this, each script requires customization of some script-specific varia
 
 ### Running the pipeline
 
-To run each script:
+`00_copy_rename_files.sh` must be run from the login node using `bash` instead of `sbatch`.
+
+To run the other scripts:
 
 1.  **Submit the job to the slurm scheduler:** use `sbatch <script_name>.sh`.
 2.  **Monitor the job:** use `Squeue` to check the status of you jobs. After each step, check the logs for errors. 

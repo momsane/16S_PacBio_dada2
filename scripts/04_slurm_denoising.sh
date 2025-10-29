@@ -4,7 +4,7 @@
 #SBATCH --nodes 1
 #SBATCH --ntasks 1
 #SBATCH --cpus-per-task 4
-#SBATCH --mem 16000
+#SBATCH --mem 32000
 #SBATCH --partition cpu
 #SBATCH --time 05:00:00
 #SBATCH --error /work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees/logs/04_denoising.log
@@ -24,9 +24,9 @@ root=/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees
 errModel=binnedQualErrfun # use `binnedQualErrfun` if you have binned quality score, or else `PacBioErrfun`
 maxReads=1000000 # change only if memory issues arise
 maxBases=10000000000 # 1E10 strongly recommended
-detectSingletons=F # option for the dada function, if T then sequences found less than twice are kept as ASVs (not recommended)
-pool=F # option for the dada function, set to T if you expect similar composition across samples (e.g. a syncom)
-maxraref=3000 # use the multiqc output to set this value close to the max number of reads in a sample
+db2="$root"/data/databases/syncom_custom_db_addSpecies.fa # give dada a set of expected ASVs, or set to ""
+pool=F # if T, increases sensitivity in detecting rare taxa -> risk of keeping errors
+maxraref=8000 # use the multiqc output to set this value close to the max number of reads in a sample
 
 # do not modify below this line
 script="$root"/workflow/scripts/04_denoising.R
@@ -43,7 +43,7 @@ echo input.readcounts: "$readcounts"
 echo maxReads: "$maxReads"
 echo errModel: "$errModel"
 echo maxBases: "$maxBases"
-echo detectSingletons: "$detectSingletons"
+echo db2: "$db2"
 echo pool: "$pool"
 echo maxraref: "$maxraref"
 echo out.denois: "$out_denois"
@@ -57,7 +57,7 @@ Rscript --vanilla "$script" \
     "$maxReads" \
     "$errModel" \
     "$maxBases" \
-    "$detectSingletons" \
+    "$db2" \
     "$pool" \
     "$maxraref" \
     "$out_denois" \

@@ -10,6 +10,11 @@ if(!require(tidyr)){
   library(tidyr)
 }
 
+if(!require(stringr)){
+  install.packages(pkgs = 'stringr', repos = 'https://stat.ethz.ch/CRAN/')
+  library(stringr)
+}
+
 if(!require(ggplot2)){
   install.packages(pkgs = 'ggplot2', repos = 'https://stat.ethz.ch/CRAN/')
   library(ggplot2)
@@ -26,6 +31,16 @@ if(!require(phyloseq)){
   }
   BiocManager::install("phyloseq")
   library(phyloseq)
+}
+
+if(!require(RColorBrewer)){
+  install.packages(pkgs = 'RColorBrewer', repos = 'https://stat.ethz.ch/CRAN/')
+  library(RColorBrewer)
+}
+
+if(!require(grDevices)){
+  install.packages(pkgs = 'grDevices', repos = 'https://stat.ethz.ch/CRAN/')
+  library(grDevices)
 }
 
 if(!require(iNEXT)){
@@ -49,15 +64,19 @@ if (length(args) != 7){
   out.plots <- args[7] # folder to write plots
 }
 
-# root <- "/Volumes/D2c/mgarcia/20240708_mgarcia_syncom_invivo/exp01_inoculation_methods/pacbio_analysis/run1_bees"
-# # root <- "/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees"
-# input.ps <- file.path(root, "results", "assign_taxonomy", "phyloseq_object.RDS")
+# root <- "/Volumes/D2c/mgarcia/20240708_mgarcia_syncom_assembly/pacbio_analysis/run1_bees"
+# input.ps <- file.path(root, "results", "assign_taxonomy", "phyloseq_object_filtered.RDS")
 # input.clusters <- file.path(root, "workflow", "config", "all_16S_cd-hit_clusters_tax_full.tsv")
 # input.metadata <- file.path(root, "workflow", "config", "metadata.tsv")
 # facet_var <- "SampleType"
 # maxraref <- 2500
 # out.quant <- file.path(root, "results", "quantify_strains")
 # out.plots <- file.path(root, "plots")
+
+if (facet_var %in% c("Kingdom", "Phylum", "Class", "Family", "Order", "Genus", "Species")){
+  cat("Error: the provided facet_var is conflicting with taxonomic rank names! Please change the name of this variable before continuing.\n")
+  quit(save="no")
+}
 
 ### Create outdirs ###
 
@@ -152,31 +171,84 @@ cat("Generating plots\n")
 # generate barplots
 df <- df %>%
   left_join(meta, by = "SampleID")
-  
+
+# custom label with species and strain name
+df <- df %>% 
+  mutate(label = paste(substr(Genus, 1, 1),". ", word(Species, 2), " ", Strain, sep = ""))
+
 # order strains by their species
 df$Strain <- factor(df$Strain, levels = unique(df$Strain), ordered = T)
+df$label <- factor(df$label, levels = unique(df$label), ordered = T)
+
+# palette
+generate_palette <- function(df) {
+  
+  # get genera
+  genera <- unique(df[["Genus"]])
+  
+  # assign color to genera
+  n_colors <- length(genera)
+  if (n_colors <= 8) {
+    base_colors <- brewer.pal(n_colors, "Dark2")
+  } else {
+    base_colors <- rainbow(n_colors)
+  }
+  
+  base_colors <- setNames(base_colors, genera)
+  
+  # Prepare result vector
+  colors <- character(nrow(df))
+  
+  # Loop over each genus and assign alpha variations per species
+  for (g in genera) {
+    species_in_genus <- df$label[df$Genus == g]
+    n_species <- length(species_in_genus)
+    
+    # Generate transparencies between 0.4 and 1 (evenly spaced)
+    alphas <- seq(0.4, 1, length.out = n_species)
+    
+    # Make transparent versions of the base color
+    genus_colors <- scales::alpha(base_colors[g], alphas)
+    
+    # Assign these transparencies to the corresponding rows
+    for (i in seq_along(species_in_genus)) {
+      rows <- which(df[["Genus"]] == g & df[["label"]] == species_in_genus[i])
+      colors[rows] <- genus_colors[i]
+    }
+  }
+  
+  df$color <- colors
+  return(df)
+}
+
+
+pal <- generate_palette(unique(df[ ,c("Genus", "label")]))
 
 p1 <- ggplot(
   df,
   aes(
     x = SampleID,
     y = count,
-    fill = Strain
+    fill = label
   )
 ) +
   geom_col() +
   labs(
-    y = "Count"
+    y = "Count",
+    fill = ""
   ) +
-  facet_wrap(vars(facet_var)) +
+  scale_fill_manual(values = setNames(pal$color,pal$label)) +
   theme_bw() +
   theme(
-    #strip.text.x = element_text(angle=90),
     strip.background=element_blank(),
     axis.title.x=element_blank(),
     axis.text.x=element_blank(),
     axis.ticks.x=element_blank(),
-    legend.key.size = unit(0.4, "cm"),
+    # legend
+    legend.position = "right",
+    legend.key.size = unit(0.4, 'cm'),
+    legend.title = element_text(size = 8),
+    legend.text = element_text(size = 6),
     panel.grid.major = element_blank(),
     panel.grid.minor = element_blank()
   ) + 
@@ -187,22 +259,26 @@ p2 <- ggplot(
   aes(
     x = SampleID,
     y = rel_abun,
-    fill = Strain
+    fill = label
   )
 ) +
   geom_col() +
   labs(
-    y = "Relative abundance (%)"
+    y = "Relative abundance (%)",
+    fill = ""
   ) +
-  facet_wrap(vars(facet_var)) +
+  scale_fill_manual(values = setNames(pal$color,pal$label)) +
   theme_bw() +
   theme(
-    #strip.text.x = element_text(angle=90),
     strip.background=element_blank(),
     axis.title.x=element_blank(),
     axis.text.x=element_blank(),
     axis.ticks.x=element_blank(),
-    legend.key.size = unit(0.4, "cm"),
+    # legend
+    legend.position = "right",
+    legend.key.size = unit(0.4, 'cm'),
+    legend.title = element_text(size = 8),
+    legend.text = element_text(size = 6),
     panel.grid.major = element_blank(),
     panel.grid.minor = element_blank()
   ) + 
@@ -216,46 +292,12 @@ if (facet_var[1] != ""){
 ggsave(file.path(out.plots, "06_strain_barplot_count.pdf"), p1, device="pdf", width = 8, height = 6)
 ggsave(file.path(out.plots, "06_strain_barplot_relative.pdf"), p2, device="pdf", width = 8, height = 6)
 
-# ASV counts to strains counts 
-
-asv_ab <- apply(tab, 1, sum)
-strain_ab <- apply(C, 2, sum)
-ab <- merge(asv_ab, strain_ab, by = 0)
-colnames(ab) <- c("SampleID", "ASV_abundance_total", "strain_abundance_total")
-ab <- ab %>% 
-  left_join(meta, by = "SampleID") %>% 
-  mutate(ratio_ASV_strain = ASV_abundance_total/strain_abundance_total) # should be close to constant
-
-ab_plot <- ggplot(
-  ab,
-  aes(
-    x = ASV_abundance_total,
-    y = strain_abundance_total
-  )
-) +
-  labs(
-    x = "Total ASV counts",
-    y = "Total strain counts"
-  ) +
-  theme_bw() +
-  theme(
-    legend.key.size = unit(0.4, "cm"),
-    panel.grid.minor = element_blank()
-  )
-
-if (facet_var[1] != ""){
-  ab_plot <- ab_plot + geom_point(aes(color = !!sym(facet_var)), alpha = 0.6)
-} else {
-  ab_plot <- ab_plot + geom_point(alpha = 0.6)
-}
-
-ggsave(file.path(out.plots, "06_ASV_to_strain_counts.pdf"), ab_plot, device="pdf", width = 5, height = 4)
-
 ### Rarefaction curves ###
 
 cat("Generating rarefaction curves\n")
 
 # filter out samples with total abundance of 0
+strain_ab <- apply(C, 2, sum)
 samples_keep <- names(which(strain_ab != 0))
 C2 <- C[,samples_keep]
 
@@ -268,7 +310,7 @@ dt <- iNEXT(
   knots = 50,
   se = TRUE,
   conf = 0.95,
-  nboot = 50
+  nboot = 20
 )
 
 inextqd <- dt$iNextEst$size_based %>%
@@ -330,6 +372,7 @@ qd.plot <- ggplot(
       label = SampleID
     ), size = 3, nudge_x = 70
   ) +
+  scale_y_continuous(breaks = seq(0,max(inextqd$qD[inextqd$Method != "Extrapolation"])+5,5)) +
   theme_bw() +
   labs(
     x = "# of cells",
