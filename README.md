@@ -15,6 +15,8 @@ Table of contents
     - [Merging and dereplicating 16S sequences](#merging-and-dereplicating-16s-sequences)
     - [Formatting databases for dada2](#formatting-databases-for-dada2)
     - [Comparing and merging databases](#comparing-and-merging-databases)
+- [Authors](#authors)
+- [Citing](#citing)
 
 ---
 
@@ -227,3 +229,16 @@ You are now ready to use the custom databases with dada2. You will also need `al
 ## Authors
 
 This pipeline was written by Meline Garcia. Many thanks to [Malick N`Diaye](https://github.com/MalickNdiye) and [Aiswarya Prasad](https://github.com/Aiswarya-prasad) for their suggestions.
+
+---
+
+## Citing
+
+If you use this pipeline, please cite this repository as well as its main dependencies:
+
+- [dada2](https://github.com/benjjneb/dada2): Callahan BJ, McMurdie PJ, Rosen MJ, Han AW, Johnson AJA, Holmes SP (2016). “DADA2: High-resolution sample inference from Illumina amplicon data.” Nature Methods, 13, 581-583. doi:10.1038/nmeth.3869. 
+- [bbmap](https://github.com/bbushnell/BBTools): Bushnell, B. (2014) BBMap: A Fast, Accurate, Splice-Aware Aligner. 
+9th Annual Genomics of Energy & Environment Meeting, Walnut Creek, CA.
+- [fastQC](https://github.com/s-andrews/FastQC): https://www.bioinformatics.babraham.ac.uk/projects/fastqc/
+- [multiQC](https://github.com/MultiQC/MultiQC): Philip Ewels, Måns Magnusson, Sverker Lundin, Max Käller, MultiQC: summarize analysis results for multiple tools and samples in a single report, Bioinformatics, Volume 32, Issue 19, October 2016, Pages 3047–3048, https://doi.org/10.1093/bioinformatics/btw354
+- [iNEXT](https://github.com/AnneChao/iNEXT): Hsieh, T.C., Ma, K.H. & Chao, A. (2016) iNEXT: An R package for interpolation and extrapolation of species diversity (Hill numbers). Methods in Ecology and Evolution, 7, 1451-1456.
