@@ -70,14 +70,15 @@ if (length(args) != 8){
   out.plots <- args[8] # folder to write plots (can be the same folder throughout the pipeline)
 }
 
-# input.raw <- "/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/results/prerarefied_reads"
+# root <- file.path("/Volumes", "D2c", "mgarcia", "20240708_mgarcia_syncom_assembly", "pacbio_analysis", "run1_bees")
+# input.raw <- file.path(root, "results", "prerarefied_reads")
 # fwd.primer <- "AGRGTTYGATYMTGGCTCAG"
 # rev.primer <- "RGYTACCTTGTTACGACTT"
 # minLen <- 1200
 # maxLen <- 1700
 # maxEE <- 3
-# out.preproc <- "/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/results/preprocessing"
-# out.plots <- "/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/plots"
+# out.preproc <- file.path(root, "results", "preprocessing")
+# out.plots <- file.path(root, "plots")
 
 ### Create outdirs ###
 
@@ -121,7 +122,9 @@ primer_removal_summary <- foreach(i = seq_along(raw_reads_paths), .packages = c(
                        primer.fwd = fwd.primer,
                        primer.rev = rc(rev.primer),
                        orient=TRUE,
-                       verbose=TRUE) # cannot multithread with dada2
+                       verbose=TRUE,
+                       max.mismatch = 4
+                       ) # cannot multithread with dada2
 }
 
 cat(paste0("Mean proportion of reads removed: ", round(mean(1-primer_removal_summary[,"reads.out"]/primer_removal_summary[,"reads.in"]),2),"\n"))
@@ -153,7 +156,7 @@ track_filtering <- foreach(i = seq_along(trimmed_reads_paths), .packages = c("da
                 maxLen=maxLen,
                 maxN=0, # no ambiguous bases
                 rm.phix=FALSE,
-                maxEE=3, # max two expected errors per sequence, calculated from the quality score
+                maxEE=maxEE,
                 multithread = TRUE,
                 verbose = T) 
 }
