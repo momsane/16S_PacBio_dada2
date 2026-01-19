@@ -46,7 +46,7 @@ if (length(args) != 10){
   errModel <- args[4] # dada2-provided function to estimate the error model
   maxBases <- args[5] # max number of bases to use for error model inference
   db2 <- args[6] # database of ASVs expected in the samples
-  pool <- args[7] # "T" or "F", whether to pool samples for AVS inference (less efficient but more sensitive)
+  pool <- args[7] # "T" or "pseudo" or "F", whether to pool samples for ASV inference
   maxraref <- args[8] # maximum number of reads to extrapolate rarefaction curves
   out.denois <- args[9] # folder to write denoising results
   out.plots <- args[10] # folder to write plots
@@ -145,42 +145,45 @@ cat("Error model built\n")
 cat("Denoising into ASVs\n")
 
 # options:
-# pooling ON/OFF
+# pooling T/pseudo/F
 # priors yes/no
 
-run_dada_single <- function(dereplicated_seqs, errM = error_model, priors_db = db2){
-  # with priors
-  if (priors_db != ""){
-    my_priors <- getSequences(priors_db)
-    return(dada(dereplicated_seqs, err=errM, multithread=TRUE, verbose = T, priors = my_priors))
-  }
-  # without priors
-  else {
-    return(dada(dereplicated_seqs, err=errM, multithread=TRUE, verbose = T))
-  }
-}
+# run_dada_single <- function(dereplicated_seqs, errM = error_model, priors_db = db2){
+#   # with priors
+#   if (priors_db != ""){
+#     my_priors <- getSequences(priors_db)
+#     return(dada(dereplicated_seqs, err=errM, multithread=TRUE, verbose = T, priors = my_priors))
+#   }
+#   # without priors
+#   else {
+#     return(dada(dereplicated_seqs, err=errM, multithread=TRUE, verbose = T))
+#   }
+# }
 
-if (pool == "F"){
-  if (db2 == ""){
-    cat("No priors given\n")
-  } else {
-    cat(paste0("Using ", db2, " as priors\n"))
-  }
-  dds <- list()
-  for (i in seq_along(dereps)) {
-    file = names(dereps)[i]
-    cat(paste0("Processing:", file, "\n"))
-    dds[[file]] <- run_dada_single(dereplicated_seqs = dereps[i])
-  }
-} else if (pool == "T"){
-  if (db2 == ""){
-    cat("No priors given\n")
+if (db2 == ""){
+  cat("No priors given\n")
+  if (pool=="T"){
     dds <- dada(dereps, err=error_model, pool=TRUE, multithread=TRUE, verbose = T)
+    } else if (pool=="pseudo") {
+    dds <- dada(dereps, err=error_model, pool="pseudo", multithread=TRUE, verbose = T)
+    } else if (pool=="F") {
+    dds <- dada(dereps, err=error_model, pool=FALSE, multithread=TRUE, verbose = T)
+    } else {
+      stop("Incorrect pooling option provided\n")
+    }
   } else {
     cat(paste0("Using ", db2, " as priors\n"))
-    dds <- dada(dereps, err=error_model, pool=TRUE, multithread=TRUE, verbose = T, priors = getSequences(db2))
+    my_priors <- getSequences(db2)
+    if (pool=="T"){
+      dds <- dada(dereps, err=error_model, pool=TRUE, priors=my_priors, multithread=TRUE, verbose = T)
+    } else if (pool=="pseudo") {
+      dds <- dada(dereps, err=error_model, pool="pseudo", priors=my_priors, multithread=TRUE, verbose = T)
+    } else if (pool=="F") {
+      dds <- dada(dereps, err=error_model, pool=FALSE, priors=my_priors, multithread=TRUE, verbose = T)
+    } else {
+      stop("Incorrect pooling option provided\n")
+    }
   }
-}
 
 saveRDS(dds, file.path(out.denois, "denoised_seqs.rds"))
 
@@ -200,9 +203,9 @@ cat(paste0("Found ", ncol(ASV_samples_table), " ASVs across the ", nrow(ASV_samp
 
 cat("Removing chimera\n")
 
-if (pool == "F"){
+if (pool %in% c("pseudo", "F")){
   ASV_samples_table_noChim <- removeBimeraDenovo(ASV_samples_table, verbose = T, multithread = T)
-} else if (pool == "T"){
+} else {
   cat("Removing chimera in pooled mode")
   ASV_samples_table_noChim <- removeBimeraDenovo(ASV_samples_table, method = "pooled", verbose = T, multithread = T)
 }

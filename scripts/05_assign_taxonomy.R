@@ -25,6 +25,11 @@ if(!require(ggplot2)){
   library(ggplot2)
 }
 
+if(!require(rlang)){
+  install.packages(pkgs = 'rlang', repos = 'https://stat.ethz.ch/CRAN/')
+  library(rlang)
+}
+
 if(!require(dada2)){
   if(!require(devtools)){
     install.packages(pkgs = 'devtools', repos = 'https://stat.ethz.ch/CRAN/')
@@ -81,24 +86,27 @@ if (length(args) != 9){
   input.readcounts <- args[3]
   db1 <- args[4] # taxonomy database for assignTaxonomy (GreenGenes2, SILVA, or custom)
   db2 <- args[5] # taxonomy database for addSpecies (SILVA or custom), put "" if not needed
-  rarefy_to <- args[6] # number of reads to rarefy to; if equals -1, no rarefaction
-  facet_var <- args[7] # one column in the metadata table to facet the taxonomy plot, put "" if not needed
-  out.tax <- args[8] # folder to write denoising results
-  out.plots <- args[9] # folder to write plots
+  min_boot <- args[6] # numerical threshold to retain taxonomic assignment
+  rarefy_to <- args[7] # number of reads to rarefy to; if <=0, no rarefaction
+  facet_var <- args[8] # one column in the metadata table to facet the taxonomy plot, put "" if not needed
+  out.tax <- args[9] # folder to write denoising results
+  out.plots <- args[10] # folder to write plots
 }
 
-# root <- "/Volumes/D2c/mgarcia/20240708_mgarcia_syncom_assembly/pacbio_analysis/run1_bees"
-# input.asvs <- file.path(root, "results", "denoising", "ASV_samples_table_noChim.rds")
-# input.metadata <- file.path(root, "workflow", "config", "metadata.tsv")
-# input.readcounts <- file.path(root, "results", "denoising", "read_counts_steps.tsv")
-# db1 <- file.path(root, "data", "databases", "amplicon_based_db/syncom_custom_db_toSpecies_trainset.fa")
-# db2 <- file.path(root, "data", "databases", "amplicon_based_db/syncom_custom_db_addSpecies.fa")
-# rarefy_to <- -1
-# facet_var <- "SampleType"
-# out.tax <- file.path(root, "results", "assign_taxonomy")
-# out.plots <- file.path(root, "plots")
+root <- "/Volumes/RECHERCHE/FAC/FBM/DMF/pengel/general_data/D2c/mgarcia/20240708_mgarcia_syncom_assembly/pacbio_analysis/run1_bees"
+input.asvs <- file.path(root, "results", "denoising", "ASV_samples_table_noChim.rds")
+input.metadata <- file.path(root, "workflow", "config", "metadata.tsv")
+input.readcounts <- file.path(root, "results", "denoising", "read_counts_steps.tsv")
+db1 <- file.path(root, "data", "databases", "amplicon_based_db/syncom_custom_db_toSpecies_trainset.fa")
+db2 <- file.path(root, "data", "databases", "amplicon_based_db/syncom_custom_db_addSpecies.fa")
+min_boot <- 50
+rarefy_to <- -1
+facet_var <- "SampleType"
+out.tax <- file.path(root, "results", "assign_taxonomy")
+out.plots <- file.path(root, "plots")
 
-if (facet_var %in% c("Kingdom", "Phylum", "Class", "Family", "Order", "Genus", "Species")){
+rank_names <- c("Kingdom", "Phylum", "Class", "Family", "Order", "Genus", "Species", "Strain", "Cluster")
+if (facet_var %in% rank_names){
   cat("Error: the provided facet_var is conflicting with taxonomic rank names! Please change the name of this variable before continuing.\n")
   quit(save="no")
 }
@@ -122,7 +130,7 @@ reads_df <- read.table(input.readcounts, sep = "\t", header = T)
 
 ### Rarefy reads if needed ###
 
-if (rarefy_to == -1){
+if (rarefy_to <= 0){
   cat("No rarefaction\n")
   ASV_samples_table_noChim2 <- ASV_samples_table_noChim
 } else {
@@ -151,12 +159,16 @@ if (rarefy_to == -1){
 
 cat(paste0("Using database ", db1, " to assign taxonomy\n"))
 
-ASV_taxonomy <- assignTaxonomy(
+taxonomy_object <- assignTaxonomy(
   seqs = ASV_samples_table_noChim2,
   refFasta = db1,
-  minBoot = 80,
+  minBoot = min_boot,
+  outputBootstraps = TRUE,
   multithread = TRUE,
   verbose = T)
+
+ASV_taxonomy <- taxonomy_object$tax
+bootstraps <- taxonomy_object$boot
 
 cat("\n")
 
@@ -359,38 +371,89 @@ saveRDS(object = ps, file = file.path(out.tax, "phyloseq_object_filtered.RDS"))
 
 cat("Finished creating and filtering phyloseq object\n")
 
+### Analyze bootstraps ###
+
+# combine and restructure data
+
+## get bootstraps
+bootstraps <- bootstraps %>% 
+  as.data.frame() %>% 
+  mutate(seq = rownames(bootstraps), .before = "Kingdom")
+bootstraps <- bootstraps %>% 
+  pivot_longer(colnames(bootstraps)[-1], names_to = "rank", values_to = "confidence")
+
+## get labels
+ASV_taxonomy3_long <- ASV_taxonomy3 %>% 
+  as.data.frame() %>% 
+  mutate(seq = rownames(ASV_taxonomy3), .before = "Kingdom")
+ASV_taxonomy3_long <- ASV_taxonomy3_long %>% 
+  pivot_longer(colnames(ASV_taxonomy3_long)[-1], names_to = "rank", values_to = "label")
+
+## combine data
+bootstraps <- bootstraps %>% 
+  left_join(ASV_taxonomy3_long, by = c("seq", "rank")) %>% # add ASV name if relevant
+  left_join(dna_df[ ,c("ASV", "seq")], by = "seq") %>% 
+  relocate(ASV, .after = "seq")
+
+bootstraps$rank <- factor(bootstraps$rank, levels=rank_names, ordered = T)
+
+## plot confidence per rank
+confidence_plot <- ggplot(
+  bootstraps,
+  aes(
+    x = rank,
+    y = confidence
+  )
+) +
+  geom_hline(yintercept = 80, linetype = 2, linewidth = 0.4, color = "#428500") +
+  geom_hline(yintercept = 50, linetype = 2, linewidth = 0.4, color = "#E8B823") +
+  geom_hline(yintercept = 30, linetype = 2, linewidth = 0.4, color = "#961200") +
+  geom_boxplot(outliers = FALSE) +
+  geom_jitter(alpha = 0.3, size = 2, width = 0.2, height = 0.1) +
+  scale_y_continuous(breaks = seq(0,100,20), limits = c(0,105), expand=c(0,0)) +
+  labs(
+    x = "Rank",
+    y = "Confidence (%)"
+  ) +
+  theme_bw() +
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  )
+#confidence_plot
+
+## save plot
+ggsave(
+  file.path(out.plots, paste0("05_ASV_taxonomy_confidence.pdf")),
+  confidence_plot,
+  device="pdf",
+  width = 6,
+  height = 5
+)
+
 ### Create a single abundance table ###
 
-tab <- otu_table(ps) # samples are rows and ASV are columns
-class(tab) <- "matrix" # warning but it's fine
-tax <- as.data.frame(tax_table(ps))
-tax <- tax %>% 
-  mutate(ASV = rownames(tax), .before = "Kingdom")
+abundance_table_long <- psmelt(ps) %>% 
+  select(-"Sample") %>% 
+  dplyr::rename(
+    ASV = OTU,
+    read_count = Abundance
+  ) %>%
+  arrange(SampleID, ASV)
 
-cols <- colnames(tab)
-tab2 <- as.data.frame(tab) %>% 
-  mutate(SampleID = rownames(tab)) %>%
-  pivot_longer(all_of(cols), names_to = "ASV", values_to = "count") %>% 
-  left_join(tax, by = "ASV") %>% 
-  left_join(meta, by = "SampleID")
-
-write.table(tab2, file.path(out.tax, "sample_ASV_table_long.tsv"), sep = "\t", quote = F, col.names = T, row.names = F)
+write.table(abundance_table_long, file.path(out.tax, "sample_ASV_table_long.tsv"), sep = "\t", quote = F, col.names = T, row.names = F)
 
 ### Compute ASV total abundance and prevalence ###
 
 cat("Computing ASV total abundance and prevalence\n")
 
-# total abundance
-total_abundance <- sort(apply(X=tab, MARGIN=2, sum)) # total abundance of each ASV
-# prevalence
-tab_bin <- tab
-tab_bin[tab_bin > 0] <- 1
-prevalence <- 100*sort(apply(X=tab_bin, MARGIN=2, sum))/dim(tab_bin)[1]
-
-df_ab <- as.data.frame(cbind(total_abundance, prevalence))
-df_ab <- df_ab %>% 
-  mutate(ASV=rownames(df_ab)) %>% 
-  left_join(tax, by = "ASV")
+df_ab <- abundance_table_long %>% 
+  group_by(!!!syms(intersect(rank_names, colnames(abundance_table_long)))) %>% 
+  summarize(
+    prevalence = 100*sum(read_count > 0)/length(unique(abundance_table_long$SampleID)),
+    total_read_count = sum(read_count),
+    avg_read_count = mean(read_count)
+  )
   
 # plot
 if (db2 != ""){
@@ -401,7 +464,7 @@ if (db2 != ""){
   asv_stats <- ggplot(
     df_ab2,
     aes(
-      x = total_abundance,
+      x = total_read_count,
       y = prevalence,
       color = Genus_label
     )) +
@@ -411,20 +474,21 @@ if (db2 != ""){
     labs(
       x = "Total abundance (reads)",
       y = "Prevalence (%)",
-      color = "Genus of exact matches"
+      color = "Genus (only exact matches)"
     ) +
     theme_bw() +
     theme(
-      legend.position = "right"
+      legend.position = "right",
+      panel.grid = element_blank()
     )
   
-  ggsave(file.path(out.plots, "05_ASV_abundance_prevalence.pdf"), asv_stats, device="pdf", width = 8, height = 6)
+  ggsave(file.path(out.plots, "05_ASV_abundance_prevalence.pdf"), asv_stats, device="pdf", width = 6, height = 4)
 
 } else {
   asv_stats <- ggplot(
     df_ab,
     aes(
-      x = total_abundance,
+      x = total_read_count,
       y = prevalence
     )) +
     geom_point(alpha = 0.5) +
@@ -434,19 +498,25 @@ if (db2 != ""){
       x = "Total abundance (reads)",
       y = "Prevalence (%)"
     ) +
-    theme_bw()
+    theme_bw() +
+    theme(
+      panel.grid = element_blank()
+    )
   
-  ggsave(file.path(out.plots, "05_ASV_abundance_prevalence.pdf"), asv_stats, device="pdf", width = 6, height = 6)
+  ggsave(file.path(out.plots, "05_ASV_abundance_prevalence.pdf"), asv_stats, device="pdf", width = 4, height = 4)
 }
 
 ### Final report of number of reads ###
 
 # compute number of reads
-counts <- as.data.frame(apply(tab, 1, sum))
-colnames(counts) <- "n_reads"
-counts <- counts %>%
-  mutate(sample = rownames(counts), stage = "AssignTaxonomy") %>% 
-  mutate(basename = paste(sample, ".fastq.gz", sep = "")) %>% 
+counts <- abundance_table_long %>%
+  group_by(SampleID) %>%
+  summarize(n_reads = sum(read_count)) %>%
+  dplyr::rename(sample = SampleID) %>% 
+  mutate(
+    stage = "AssignTaxonomy",
+    basename = paste(sample, ".fastq.gz", sep = "")
+    ) %>% 
   rbind(reads_df)
 counts <- counts[ ,c("basename", "sample", "stage", "n_reads")]
 rownames(counts) <- c(1:nrow(counts))
