@@ -224,6 +224,7 @@ generate_palette <- function(df) {
 
 pal <- generate_palette(unique(df[ ,c("Genus", "label")]))
 
+# read counts
 p1 <- ggplot(
   df,
   aes(
@@ -238,6 +239,7 @@ p1 <- ggplot(
     fill = ""
   ) +
   scale_fill_manual(values = setNames(pal$color,pal$label)) +
+  scale_y_continuous(expand = c(0,0)) +
   theme_bw() +
   theme(
     strip.background=element_blank(),
@@ -254,6 +256,7 @@ p1 <- ggplot(
   ) + 
   guides(fill=guide_legend(ncol =1))
 
+# relative abundance
 p2 <- ggplot(
   df,
   aes(
@@ -268,6 +271,7 @@ p2 <- ggplot(
     fill = ""
   ) +
   scale_fill_manual(values = setNames(pal$color,pal$label)) +
+  scale_y_continuous(expand = c(0,0)) +
   theme_bw() +
   theme(
     strip.background=element_blank(),
