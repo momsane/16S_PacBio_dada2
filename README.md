@@ -25,8 +25,8 @@ Table of contents
 **Important note 1**: this pipeline should be executed independently for separate runs, as the error profile is unique to each run.
 
 **Important note 2**: depending on the type of library you have and how the fastQ files were produced, you need to select between different options for the filtering and denoising steps. 
-- Consensus sequences from a Kinnex library have less passes, therefore the quality is lower. I would recommend using maxEE=3 to avoid being too strict.
-- The CSS software used to infer consensus sequences bins the quality scores to reduce file size, see [here](https://ccs.how/faq/qv-binning.html). If you have such binned quality scores, you need to choose the appropriate function for the `learnErrors` function. 
+- Consensus sequences from a Kinnex library have less passes, therefore the quality is lower. I would recommend using maxEE=3-4 to avoid being too strict.
+- The CSS software used to infer consensus sequences bins the quality scores to reduce file size, see [here](https://ccs.how/faq/qv-binning.html). If you have such binned quality scores, you need to choose the appropriate function for **denoising** step. 
 
 ### Overview
 
@@ -47,7 +47,7 @@ dada2 is implemented in Rscripts called by the bash scripts. **There should not 
 
 - This pipeline is designed to be executed on a slurm cluster.
 - Conda/mamba.
-- R, fastQC, multiQC and bbmap (see envs).
+- R, fastQC, multiQC and bbmap (see *envs*).
 
 ### Setting up the work environment
 
@@ -81,12 +81,12 @@ Install all the required conda environments using the .yaml files located in the
 
 ### Data Preparation
 
-Before running the pipeline, you need to prepare some data. It is important that each of these tables be in Unix format. If you modify them in Excel for instance, they will not be in Unix format. You can use the command-line tool dos2unix to convert them. Make sure also there is a line return after the last line in the table otherwise the last line will not be read.
+Before running the pipeline, you need to prepare some data. It is important that each of these tables be in Unix format. If you modify them in Excel for instance, they will not be in Unix format. You can use the command-line tool **dos2unix** to convert them. Make sure also there is a line return after the last line in the table otherwise the last line will not be read.
 
 1.  **File naming table:** the raw read files you got from the sequencing facility have long non-informative names. If not done already, you will rename them with the SampleID. Create a table like `config/rename_files.tsv` where the first column is the current name of each file, and the second column is the new name. This table has no header. If you have samples from different pools, you will need to create one table per pool because some samples might have the same original name.
 2.  **Metadata file:** modify `config/metadata.tsv` according to your samples. You do not need to keep the same columns except for the first one, `SampleID`. This first column must contain the sample names (filenames without the `.fastq.gz` extension). Make sure there are no empty cells in this table - use NA values if necessary.
 3.  **Read rarefaction table (optional):** if you have very uneven depth in your dataset, you might want to consider rarefying the raw reads to limit unnecessary computation time and resources for large samples. Modify `config/pre_rarefaction.tsv` according to your needs. For bee gut samples, 20,000 reads is way more than enough.
-4.  **Raw reads:** you are now ready to copy them from the NAS. Modify the script `copy_rename_files.sh` with the correct paths. Then execute it from the login node (i.e. use `bash` instead of `sbatch` to submit it). If you have samples from different pools, you will need to execute this script independently for each pool.
+4.  **Raw reads:** you are now ready to copy them from the NAS. Modify the script `copy_rename_files.sh` with the correct paths. Then execute it from the login node (*i.e.* use `bash` instead of `sbatch` to submit it). If you have samples from different pools, you will need to execute this script independently for each pool.
 5. **Databases:** you need to provide at least one database to assign taxonomy to your ASVs. Refer to [this web page](https://benjjneb.github.io/dada2/training.html) for more information and links to download the databases.
 
 ### Adapting the scripts
@@ -95,7 +95,7 @@ Only the `.sh` scripts need to be modified. You will need to modify only the beg
 
 - the commands to initialize conda according to the type of installation you are using
 - the input variables, for instance the path to the root directory
-- the pre-rarefaction and the fastQC scripts are array jobs (argument `--array` in the slurm header), so you need to modify the range of the arrays. `2-50` means you will process files described in lines 2 to 50 of `config/metadata.tsv`. We start at 2 to skip the header. So your array range should be `2-<number of samples>+1`
+- the pre-rarefaction and the fastQC scripts are array jobs (argument `--array` in the slurm header), so you need to modify the range of the arrays. `2-50` means you will process files described in lines 2 to 50 of `config/metadata.tsv`. We start at 2 to skip the header. So your array range should be `2-<number of samples + 1>`
 - you should not need to modify the resource requirements, unless your jobs get killed.
 
 On top of this, each script requires customization of some script-specific variables. For instance, in `01_fastqc_preproc.sh` and `02_slurm_preprocessing.sh` you must modify the `reads` variable, depending on whether you did the pre-rarefaction step.
@@ -222,7 +222,7 @@ seqkit seq compare_gg2_custom_toGenus > syncom_custom_db_toGenus_trainset.fa
 cat syncom_custom_db_toGenus.fa >> syncom_custom_db_toGenus_trainset.fa
 ```
 
-You are now ready to use the custom databases with dada2. You will also need `all_16S_cd-hit_clusters_tax_full.tsv` to run the strain quantification script. I personally like to use the `toSpecies_trainset` with `assignTaxonomy()`, but you can instead use the `toGenus_trainset` with this function to limit memory usage if you are not interested in the species classification of 'contaminants'.
+You are now ready to use the custom databases with dada2. You will also need `all_16S_cd-hit_clusters_tax_full.tsv` to run the strain quantification script. I personally like to use the `toSpecies_trainset` with `assignTaxonomy()`, but you can instead use the `toGenus_trainset` with this function to limit memory usage if you are not interested in the species-level classification of 'contaminants'.
 
 ---
 
