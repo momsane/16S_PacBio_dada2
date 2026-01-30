@@ -3,10 +3,10 @@
 #SBATCH --account pengel_general_data
 #SBATCH --nodes 1
 #SBATCH --ntasks 1
-#SBATCH --cpus-per-task 4
-#SBATCH --mem 32000
+#SBATCH --cpus-per-task 6
+#SBATCH --mem 40000
 #SBATCH --partition cpu
-#SBATCH --time 05:00:00
+#SBATCH --time 07:00:00
 #SBATCH --error /work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees/logs/04_denoising.log
 #SBATCH --output /work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees/logs/04_denoising.log
 
@@ -22,10 +22,10 @@ conda activate R # Activate Conda env
 # Variables to modify
 root=/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees
 errModel=binnedQualErrfun # use `binnedQualErrfun` if you have binned quality score, or else `PacBioErrfun`
-maxReads=1000000 # change only if memory issues arise
+maxReads=10000000 # 1E7, change only if memory issues arise
 maxBases=10000000000 # 1E10 strongly recommended
 db2="$root"/data/databases/syncom_custom_db_addSpecies.fa # give dada a set of expected ASVs, or set to ""
-pool=F # if T, increases sensitivity in detecting rare taxa -> risk of keeping errors
+pool=F # "T" or "pseudo" or "F", whether to pool samples for ASV inference
 maxraref=8000 # use the multiqc output to set this value close to the max number of reads in a sample
 
 # do not modify below this line

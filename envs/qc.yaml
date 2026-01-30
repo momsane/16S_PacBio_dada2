@@ -5,6 +5,7 @@ channels:
 dependencies:
   - fastqc
   - multiqc
+  - dos2unix
   - pip:
       - boto3
       - botocore

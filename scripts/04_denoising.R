@@ -236,7 +236,7 @@ inext_input <- t(ASV_samples_table_noChim[setdiff(names(totab), zeroes),])
 # using iNEXT so I can also estimate the sampling coverage
 dt <- iNEXT(
   inext_input, # samples must be as columns
-  q = 0,
+  q = c(0,1),
   datatype = "abundance",
   endpoint = maxraref,
   knots = 50,
@@ -247,36 +247,6 @@ dt <- iNEXT(
 
 inextqd <- dt$iNextEst$size_based %>%
   dplyr::rename(SampleID = Assemblage)
-
-sc.plot <- ggplot(
-  inextqd[inextqd$Method != "Extrapolation", ],
-  aes(
-    x = m,
-    y = SC,
-    group = SampleID
-  )
-) +
-  geom_vline(aes(xintercept = min(inextqd$m[inextqd$Method == "Observed"]), color = "low"), linetype = "dashed") + # sample with lowest number of reads
-  geom_vline(aes(xintercept = max(inextqd$m[inextqd$Method == "Observed"]), color = "high"), linetype = "dashed") + # sample with highest number of reads
-  geom_hline(yintercept = 0.95, linetype = "dashed", color = "grey80") +
-  scale_color_manual(name = "", values = c(low = "#669bbc", high = "#e76f51"), labels = c(low = "Lowest depth", high = "Highest depth")) +
-  geom_line(alpha = 0.4) +
-  geom_ribbon(
-    aes(
-      ymin = SC.LCL,
-      ymax = SC.UCL
-    ), alpha = 0.2
-  ) +
-  theme_bw() +
-  labs(
-    x = "# of reads",
-    y = "Sampling coverage (iNEXT)"
-  ) +
-  theme(
-    legend.position = "inside",
-    legend.position.inside = c(0.8,0.1),
-    legend.background = element_rect(fill=alpha('white', 0.4))
-  )
 
 qd.plot <- ggplot(
   inextqd[inextqd$Method != "Extrapolation", ],
@@ -313,10 +283,10 @@ qd.plot <- ggplot(
     legend.position = "inside",
     legend.position.inside = c(0.1,0.9),
     legend.background = element_rect(fill=alpha('white', 0.4))
-  )
+  ) +
+  facet_wrap( ~ Order.q, scales = "free_y")
 
-ggsave(file.path(out.plots, "04_sampling_coverage_ASVs.pdf"), sc.plot, device="pdf", width = 8, height = 6)
-ggsave(file.path(out.plots, "04_rarefaction_curves_ASVs.pdf"), qd.plot, device="pdf", width = 10, height = 8)
+ggsave(file.path(out.plots, "04_rarefaction_curves_ASVs.pdf"), qd.plot, device="pdf", width = 12, height = 8)
 
 write.table(
   inextqd,

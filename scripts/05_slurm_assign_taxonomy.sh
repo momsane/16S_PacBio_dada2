@@ -35,6 +35,8 @@ readcounts="$root"/results/denoising/read_counts_steps.tsv
 out_tax="$root"/results/assign_taxonomy
 out_plots="$root"/plots
 
+dos2unix "$metadata"
+
 # Execute the R script
 
 echo "Parameters:"

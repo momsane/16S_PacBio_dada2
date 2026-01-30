@@ -32,6 +32,7 @@ dependencies:
   - bioconductor-ucsc.utils
   - bioconductor-xvector
   - bioconductor-zlibbioc
+  - dos2unix
   - r=4.4=r44hd8ed1ab_1008
   - r-abind
   - r-ade4
