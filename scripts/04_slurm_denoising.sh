@@ -3,8 +3,8 @@
 #SBATCH --account pengel_general_data
 #SBATCH --nodes 1
 #SBATCH --ntasks 1
-#SBATCH --cpus-per-task 6
-#SBATCH --mem 40000
+#SBATCH --cpus-per-task 5
+#SBATCH --mem 32000
 #SBATCH --partition cpu
 #SBATCH --time 07:00:00
 #SBATCH --error /work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees/logs/04_denoising.log
@@ -22,7 +22,7 @@ conda activate R # Activate Conda env
 # Variables to modify
 root=/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees
 errModel=binnedQualErrfun # use `binnedQualErrfun` if you have binned quality score, or else `PacBioErrfun`
-maxReads=10000000 # 1E7, change only if memory issues arise
+maxReads=1000000 # 1E6 strongly recommended
 maxBases=10000000000 # 1E10 strongly recommended
 db2="$root"/data/databases/syncom_custom_db_addSpecies.fa # give dada a set of expected ASVs, or set to ""
 pool=F # "T" or "pseudo" or "F", whether to pool samples for ASV inference

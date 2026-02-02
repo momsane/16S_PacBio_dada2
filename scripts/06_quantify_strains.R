@@ -57,10 +57,10 @@ if (length(args) != 6){
 } else {
   input.ps <- args[1] # phyloseq object resulting from 05_assign_taxonomy
   input.clusters <- args[2] # table of ASVs with their assigned cd-hit cluster and user-input taxonomy
-  facet_var <- args[4] # one column in the metadata table to facet the taxonomy plot, put "" if not needed
-  maxraref <- args[5] # maximum number of 'cells' to extrapolate rarefaction curves
-  out.quant <- args[6] # folder to write quantification results
-  out.plots <- args[7] # folder to write plots
+  facet_var <- args[3] # one column in the metadata table to facet the taxonomy plot, put "" if not needed
+  maxraref <- args[4] # maximum number of 'cells' to extrapolate rarefaction curves
+  out.quant <- args[5] # folder to write quantification results
+  out.plots <- args[6] # folder to write plots
 }
 
 # root <- "/Volumes/RECHERCHE/FAC/FBM/DMF/pengel/general_data/D2c/mgarcia/20240708_mgarcia_syncom_assembly/pacbio_analysis/run1_bees"
@@ -94,8 +94,7 @@ maxraref <- as.numeric(maxraref)
 
 ### Get tables ###
 
-tab <- otu_table(ps) # samples are rows and ASV are columns
-class(tab) <- "matrix" # warning but it's fine
+tab <- otu_table(ps, taxa_are_rows=F) %>% as("matrix") # samples are rows and ASV are columns
 tax <- as.data.frame(tax_table(ps))
 tax <- tax %>% 
   mutate(ASV = rownames(tax), .before = "Kingdom")
@@ -133,7 +132,7 @@ rownames(clusters3) <- clusters3[ ,1]
 clusters3 <- clusters3[ ,-1]
 clusters3[is.na(clusters3)] <- 0
 
-# make sure ASV are ordered the same way in both matrices
+# make sure ASVs are ordered the same way in both matrices
 length(symdiff(rownames(tab2), rownames(clusters3))) # should be 0
 clusters3 <- clusters3[rownames(tab2), ]
 match <- rownames(clusters3) == rownames(tab2)

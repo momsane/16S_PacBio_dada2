@@ -3,8 +3,8 @@
 #SBATCH --account pengel_general_data
 #SBATCH --nodes 1
 #SBATCH --ntasks 1
-#SBATCH --cpus-per-task 4
-#SBATCH --mem 16000
+#SBATCH --cpus-per-task 2
+#SBATCH --mem 12000
 #SBATCH --partition cpu
 #SBATCH --time 02:00:00
 #SBATCH --error /work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees/logs/05_assign_taxonomy.log
@@ -23,8 +23,8 @@ conda activate R # Activate Conda env
 root=/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees
 db1="$root"/data/databases/syncom_custom_db_toSpecies_trainset.fa
 db2="$root"/data/databases/syncom_custom_db_addSpecies.fa
-min_boot=50 # numerical threshold to retain taxonomic assignments based on bootstrap confidence, default is 50
-rarefy_to=-1 # -1 means no rarefaction; use the rarefaction curves to set this value to a relevant number if needed
+min_boot=50 # confidence threshold (0-100) to retain taxonomic assignments based on bootstraps, default is 50
+rarefy_to=-1 # -1=no rarefaction; use rarefaction curves to set this value; do not rarefy is running decontamination afterwards
 facet_var=SampleType
 
 # do not modify below this line

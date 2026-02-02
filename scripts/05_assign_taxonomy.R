@@ -120,8 +120,8 @@ dir.create(out.tax, recursive = TRUE, showWarnings = FALSE)
 
 ### Inputs ###
 
-min_boot <- as.numeric(min_boot)
 rarefy_to <- as.numeric(rarefy_to)
+min_boot <- as.numeric(min_boot)
 
 ASV_samples_table_noChim <- readRDS(input.asvs)
 meta <- as.data.frame(read_tsv(input.metadata, show_col_types = F))
@@ -410,7 +410,7 @@ confidence_plot <- ggplot(
   geom_hline(yintercept = 50, linetype = 2, linewidth = 0.4, color = "#E8B823") +
   geom_hline(yintercept = 30, linetype = 2, linewidth = 0.4, color = "#961200") +
   geom_boxplot(outliers = FALSE) +
-  geom_jitter(alpha = 0.3, size = 2, width = 0.1, height = 0.1) +
+  geom_jitter(alpha = 0.3, size = 2, width = 0.2, height = 0.1) +
   scale_y_continuous(breaks = seq(0,100,20), limits = c(0,105), expand=c(0,0)) +
   labs(
     x = "Rank",
@@ -455,7 +455,7 @@ df_ab <- abundance_table_long %>%
     total_read_count = sum(read_count),
     avg_read_count = mean(read_count)
   )
-  
+
 # plot
 if (db2 != ""){
   # color ASVs exactly matching references
@@ -484,7 +484,7 @@ if (db2 != ""){
     )
   
   ggsave(file.path(out.plots, "05_ASV_abundance_prevalence.pdf"), asv_stats, device="pdf", width = 6, height = 4)
-
+  
 } else {
   asv_stats <- ggplot(
     df_ab,
@@ -517,7 +517,7 @@ counts <- abundance_table_long %>%
   mutate(
     stage = "AssignTaxonomy",
     basename = paste(sample, ".fastq.gz", sep = "")
-    ) %>% 
+  ) %>% 
   rbind(reads_df)
 counts <- counts[ ,c("basename", "sample", "stage", "n_reads")]
 rownames(counts) <- c(1:nrow(counts))
