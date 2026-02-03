@@ -28,6 +28,8 @@ raw_reads="$root"/data/raw_reads
 rarefied_reads="$root"/results/prerarefied_reads
 table="$root"/workflow/config/pre_rarefaction.tsv
 
+dos2unix "$table"
+
 sample=$(awk -v ArrayTaskID=${SLURM_ARRAY_TASK_ID} 'NR==ArrayTaskID {print $1}' "$table")
 rarefy_to=$(awk -v ArrayTaskID=${SLURM_ARRAY_TASK_ID} 'NR==ArrayTaskID {print $2+0}' "$table")
 file="$raw_reads"/"$sample".fastq.gz

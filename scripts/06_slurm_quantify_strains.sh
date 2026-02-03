@@ -23,12 +23,11 @@ conda activate R # Activate Conda env
 root=/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees
 clusters="$root"/workflow/config/all_16S_cd-hit_clusters_tax_full.tsv
 facet_var=SampleType
-maxraref=4000 # set to 2 times less the value you used in the denoising step
+maxraref=4000 # set to ~4 times less the value you used in the denoising step
 
 # do not modify below this line
 script="$root"/workflow/scripts/06_quantify_strains.R
 ps="$root"/results/assign_taxonomy/phyloseq_object_filtered.RDS
-metadata="$root"/workflow/config/metadata.tsv
 out_quant="$root"/results/quantify_strains
 out_plots="$root"/plots
 
@@ -37,7 +36,6 @@ out_plots="$root"/plots
 echo "Parameters:"
 echo input.ps: "$asvs"
 echo input.clusters: "$clusters"
-echo input.metadata: "$metadata"
 echo facet_var: "$facet_var"
 echo maxraref: "$maxraref"
 echo out.quant: "$out_quant"
@@ -48,7 +46,6 @@ echo "Refer to the Rscript for information on the parameters"
 Rscript --vanilla "$script" \
     "$ps" \
     "$clusters" \
-    "$metadata" \
     "$facet_var" \
     "$maxraref" \
     "$out_quant" \

@@ -52,22 +52,20 @@ if(!require(iNEXT)){
 
 args <- commandArgs(trailingOnly = TRUE)
 
-if (length(args) != 7){
-  stop(" Usage: 06_quantify_strains.R <cd-hit_clusters_tax_full> <metadata_table.tsv> <facet_var> <max_cells_raref> <quant_results_dir> <plots_dir>", call.=FALSE)
+if (length(args) != 6){
+  stop(" Usage: 06_quantify_strains.R <phyloseq> <cd-hit_clusters_tax_full> <facet_var> <max_cells_raref> <quant_results_dir> <plots_dir>", call.=FALSE)
 } else {
   input.ps <- args[1] # phyloseq object resulting from 05_assign_taxonomy
   input.clusters <- args[2] # table of ASVs with their assigned cd-hit cluster and user-input taxonomy
-  input.metadata <- args[3] # sample metadata table, tab-separated, first column is the the sample name
-  facet_var <- args[4] # one column in the metadata table to facet the taxonomy plot, put "" if not needed
-  maxraref <- args[5] # maximum number of 'cells' to extrapolate rarefaction curves
-  out.quant <- args[6] # folder to write quantification results
-  out.plots <- args[7] # folder to write plots
+  facet_var <- args[3] # one column in the metadata table to facet the taxonomy plot, put "" if not needed
+  maxraref <- args[4] # maximum number of 'cells' to extrapolate rarefaction curves
+  out.quant <- args[5] # folder to write quantification results
+  out.plots <- args[6] # folder to write plots
 }
 
-# root <- "/Volumes/D2c/mgarcia/20240708_mgarcia_syncom_assembly/pacbio_analysis/run1_bees"
+# root <- "/Volumes/RECHERCHE/FAC/FBM/DMF/pengel/general_data/D2c/mgarcia/20240708_mgarcia_syncom_assembly/pacbio_analysis/run1_bees"
 # input.ps <- file.path(root, "results", "assign_taxonomy", "phyloseq_object_filtered.RDS")
 # input.clusters <- file.path(root, "workflow", "config", "all_16S_cd-hit_clusters_tax_full.tsv")
-# input.metadata <- file.path(root, "workflow", "config", "metadata.tsv")
 # facet_var <- "SampleType"
 # maxraref <- 2500
 # out.quant <- file.path(root, "results", "quantify_strains")
@@ -91,15 +89,16 @@ cat("Reading inputs and extracting info\n")
 
 ps <- readRDS(input.ps)
 clusters <- read.table(input.clusters, sep = "\t", header = T)
-meta <- read.table(input.metadata, sep = "\t", header = T)
 
-### Get taxonomy table and OTU table ###
+maxraref <- as.numeric(maxraref)
 
-tab <- otu_table(ps) # samples are rows and ASV are columns
-class(tab) <- "matrix" # warning but it's fine
+### Get tables ###
+
+tab <- otu_table(ps, taxa_are_rows=F) %>% as("matrix") # samples are rows and ASV are columns
 tax <- as.data.frame(tax_table(ps))
 tax <- tax %>% 
   mutate(ASV = rownames(tax), .before = "Kingdom")
+meta <- sample_data(ps)
 
 # Quantification of known strains
 
@@ -133,7 +132,7 @@ rownames(clusters3) <- clusters3[ ,1]
 clusters3 <- clusters3[ ,-1]
 clusters3[is.na(clusters3)] <- 0
 
-# make sure ASV are ordered the same way in both matrices
+# make sure ASVs are ordered the same way in both matrices
 length(symdiff(rownames(tab2), rownames(clusters3))) # should be 0
 clusters3 <- clusters3[rownames(tab2), ]
 match <- rownames(clusters3) == rownames(tab2)
@@ -308,7 +307,7 @@ C2 <- C[,samples_keep]
 # using iNEXT so I can also estimate the sampling coverage
 dt <- iNEXT(
   C2, # samples must be as columns
-  q = 0,
+  q = c(0,1),
   datatype = "abundance",
   endpoint = maxraref,
   knots = 50,
@@ -319,36 +318,6 @@ dt <- iNEXT(
 
 inextqd <- dt$iNextEst$size_based %>%
   dplyr::rename(SampleID = Assemblage)
-
-sc.plot <- ggplot(
-  inextqd[inextqd$Method != "Extrapolation", ],
-  aes(
-    x = m,
-    y = SC,
-    group = SampleID
-  )
-) +
-  geom_vline(aes(xintercept = min(inextqd$m[inextqd$Method == "Observed"]), color = "low"), linetype = "dashed") + # sample with lowest number of reads
-  geom_vline(aes(xintercept = max(inextqd$m[inextqd$Method == "Observed"]), color = "high"), linetype = "dashed") + # sample with highest number of reads
-  geom_hline(yintercept = 0.95, linetype = "dashed", color = "grey80") +
-  scale_color_manual(name = "", values = c(low = "#669bbc", high = "#e76f51"), labels = c(low = "Lowest depth", high = "Highest depth")) +
-  geom_line(alpha = 0.4) +
-  geom_ribbon(
-    aes(
-      ymin = SC.LCL,
-      ymax = SC.UCL
-    ), alpha = 0.2
-  ) +
-  theme_bw() +
-  labs(
-    x = "# of cells",
-    y = "Sampling coverage (iNEXT)"
-  ) +
-  theme(
-    legend.position = "inside",
-    legend.position.inside = c(0.8,0.1),
-    legend.background = element_rect(fill=alpha('white', 0.4))
-  )
 
 qd.plot <- ggplot(
   inextqd[inextqd$Method != "Extrapolation", ],
@@ -386,10 +355,10 @@ qd.plot <- ggplot(
     legend.position = "inside",
     legend.position.inside = c(0.1,0.9),
     legend.background = element_rect(fill=alpha('white', 0.4))
-  )
+  ) +
+  facet_wrap( ~ Order.q, scales = "free_y")
 
-ggsave(file.path(out.plots, "06_sampling_coverage_strains.pdf"), sc.plot, device="pdf", width = 8, height = 6)
-ggsave(file.path(out.plots, "06_rarefaction_curves_strains.pdf"), qd.plot, device="pdf", width = 10, height = 8)
+ggsave(file.path(out.plots, "06_rarefaction_curves_strains.pdf"), qd.plot, device="pdf", width = 12, height = 8)
 
 write.table(
   inextqd,

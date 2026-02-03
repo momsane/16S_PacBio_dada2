@@ -127,7 +127,7 @@ primer_removal_summary <- foreach(i = seq_along(raw_reads_paths), .packages = c(
                        ) # cannot multithread with dada2
 }
 
-cat(paste0("Mean proportion of reads removed: ", round(mean(1-primer_removal_summary[,"reads.out"]/primer_removal_summary[,"reads.in"]),2),"\n"))
+cat(paste0("Mean proportion of reads retained: ", round(mean(primer_removal_summary[,"reads.out"]/primer_removal_summary[,"reads.in"]),2),"\n"))
 
 saveRDS(primer_removal_summary, file.path(out.preproc, "primer_removal_summary.rds"))
 # primer_removal_summary <- readRDS(file.path(out.preproc, "primer_removal_summary.rds"))
@@ -157,7 +157,7 @@ track_filtering <- foreach(i = seq_along(trimmed_reads_paths), .packages = c("da
                 maxN=0, # no ambiguous bases
                 rm.phix=FALSE,
                 maxEE=maxEE,
-                multithread = TRUE,
+                multithread = FALSE,
                 verbose = T) 
 }
 

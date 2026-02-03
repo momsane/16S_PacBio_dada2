@@ -78,12 +78,12 @@ if(!require(ggnested)){
 
 args <- commandArgs(trailingOnly = TRUE)
 
-if (length(args) != 9){
+if (length(args) != 10){
   stop(" Usage: 05_assign_taxonomy.R <ASV_table> <metadata_table.tsv> <read_count_table> <db_tax> <db_species> <rarefy_to> <facet_var> <tax_results_dir> <plots_dir>", call.=FALSE)
 } else {
   input.asvs <- args[1] # ASV table (no chimera)
   input.metadata <- args[2] # sample metadata table, tab-separated, first column is the the sample name
-  input.readcounts <- args[3]
+  input.readcounts <- args[3] # read counts at different stages of the pipeline
   db1 <- args[4] # taxonomy database for assignTaxonomy (GreenGenes2, SILVA, or custom)
   db2 <- args[5] # taxonomy database for addSpecies (SILVA or custom), put "" if not needed
   min_boot <- args[6] # numerical threshold to retain taxonomic assignment
@@ -93,17 +93,17 @@ if (length(args) != 9){
   out.plots <- args[10] # folder to write plots
 }
 
-root <- "/Volumes/RECHERCHE/FAC/FBM/DMF/pengel/general_data/D2c/mgarcia/20240708_mgarcia_syncom_assembly/pacbio_analysis/run1_bees"
-input.asvs <- file.path(root, "results", "denoising", "ASV_samples_table_noChim.rds")
-input.metadata <- file.path(root, "workflow", "config", "metadata.tsv")
-input.readcounts <- file.path(root, "results", "denoising", "read_counts_steps.tsv")
-db1 <- file.path(root, "data", "databases", "amplicon_based_db/syncom_custom_db_toSpecies_trainset.fa")
-db2 <- file.path(root, "data", "databases", "amplicon_based_db/syncom_custom_db_addSpecies.fa")
-min_boot <- 50
-rarefy_to <- -1
-facet_var <- "SampleType"
-out.tax <- file.path(root, "results", "assign_taxonomy")
-out.plots <- file.path(root, "plots")
+# root <- "/Volumes/RECHERCHE/FAC/FBM/DMF/pengel/general_data/D2c/mgarcia/20240708_mgarcia_syncom_assembly/pacbio_analysis/run1_bees"
+# input.asvs <- file.path(root, "results", "denoising", "ASV_samples_table_noChim.rds")
+# input.metadata <- file.path(root, "workflow", "config", "metadata.tsv")
+# input.readcounts <- file.path(root, "results", "denoising", "read_counts_steps.tsv")
+# db1 <- file.path(root, "data", "databases", "amplicon_based_db/syncom_custom_db_toSpecies_trainset.fa")
+# db2 <- file.path(root, "data", "databases", "amplicon_based_db/syncom_custom_db_addSpecies.fa")
+# min_boot <- 50
+# rarefy_to <- -1
+# facet_var <- "SampleType"
+# out.tax <- file.path(root, "results", "assign_taxonomy")
+# out.plots <- file.path(root, "plots")
 
 rank_names <- c("Kingdom", "Phylum", "Class", "Family", "Order", "Genus", "Species", "Strain", "Cluster")
 if (facet_var %in% rank_names){
@@ -121,6 +121,7 @@ dir.create(out.tax, recursive = TRUE, showWarnings = FALSE)
 ### Inputs ###
 
 rarefy_to <- as.numeric(rarefy_to)
+min_boot <- as.numeric(min_boot)
 
 ASV_samples_table_noChim <- readRDS(input.asvs)
 meta <- as.data.frame(read_tsv(input.metadata, show_col_types = F))
@@ -454,7 +455,7 @@ df_ab <- abundance_table_long %>%
     total_read_count = sum(read_count),
     avg_read_count = mean(read_count)
   )
-  
+
 # plot
 if (db2 != ""){
   # color ASVs exactly matching references
@@ -483,7 +484,7 @@ if (db2 != ""){
     )
   
   ggsave(file.path(out.plots, "05_ASV_abundance_prevalence.pdf"), asv_stats, device="pdf", width = 6, height = 4)
-
+  
 } else {
   asv_stats <- ggplot(
     df_ab,
@@ -516,7 +517,7 @@ counts <- abundance_table_long %>%
   mutate(
     stage = "AssignTaxonomy",
     basename = paste(sample, ".fastq.gz", sep = "")
-    ) %>% 
+  ) %>% 
   rbind(reads_df)
 counts <- counts[ ,c("basename", "sample", "stage", "n_reads")]
 rownames(counts) <- c(1:nrow(counts))
