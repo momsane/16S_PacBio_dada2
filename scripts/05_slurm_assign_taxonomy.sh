@@ -21,10 +21,10 @@ conda activate R # Activate Conda env
 
 # Variables to modify
 root=/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees
-db1="$root"/data/databases/syncom_custom_db_toSpecies_trainset.fa
+db1="$root"/data/databases/syncom_custom_db_toSpecies_withAmel_trainset.fa
 db2="$root"/data/databases/syncom_custom_db_addSpecies.fa
 min_boot=50 # confidence threshold (0-100) to retain taxonomic assignments based on bootstraps, default is 50
-rarefy_to=-1 # -1=no rarefaction; use rarefaction curves to set this value; do not rarefy is running decontamination afterwards
+rarefy_to=-1 # -1=no rarefaction; use rarefaction curves to set this value; do NOT rarefy if running decontamination afterwards
 facet_var=SampleType
 
 # do not modify below this line

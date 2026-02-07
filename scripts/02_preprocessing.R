@@ -99,7 +99,9 @@ raw_reads_paths <- list.files(input.raw, full.names=TRUE)
 
 ### Set up parallel backend ###
 
-numCores <- detectCores()
+# numCores <- detectCores()
+numCores <- as.integer(Sys.getenv("SLURM_CPUS_PER_TASK", 1))
+cat(paste0("Number of detected cores: ", numCores, "\n"))
 cl <- makeCluster(numCores)
 registerDoParallel(cl)
 
@@ -116,7 +118,11 @@ cat(paste0("Primer-free reads written to: ", file.path(out.preproc, "primerfree_
 
 
 primer_removal_summary <- foreach(i = seq_along(raw_reads_paths), .packages = c("dada2"), .combine = 'rbind') %dopar% {
-  cat(paste0("Processing ", basename(raw_reads_paths[i]), "\n"))
+  # logging
+  con <- file(file.path(out.preproc, "primer_removal.log"), open = "a")
+  writeLines(basename(raw_reads_paths[i]), con)
+  close(con)
+  # rm primers
   res <- removePrimers(fn = raw_reads_paths[i],
                        fout = trimmed_reads_paths[i], 
                        primer.fwd = fwd.primer,
@@ -150,6 +156,11 @@ cat("Trimming and filtering reads\n")
 filtered_trimmed_reads_paths <- file.path(out.preproc, "trimmed_filtered_reads", basename(trimmed_reads_paths))
 
 track_filtering <- foreach(i = seq_along(trimmed_reads_paths), .packages = c("dada2"), .combine = 'rbind') %dopar% {
+  # logging
+  con <- file(file.path(out.preproc, "filtering.log"), open = "a")
+  writeLines(basename(trimmed_reads_paths[i]), con)
+  close(con)
+  # rm primers
   filterAndTrim(fwd = trimmed_reads_paths[i],
                 filt = filtered_trimmed_reads_paths[i],
                 minLen=minLen,
@@ -161,7 +172,7 @@ track_filtering <- foreach(i = seq_along(trimmed_reads_paths), .packages = c("da
                 verbose = T) 
 }
 
-cat(paste0("Mean proportion of reads removed: ", round(mean(track_filtering[,"reads.out"]/track_filtering[,"reads.in"]),2), "\n"))
+cat(paste0("Mean proportion of reads retained: ", round(mean(track_filtering[,"reads.out"]/track_filtering[,"reads.in"]),2), "\n"))
 
 filtering_summary <- as.data.frame(track_filtering)
 filtering_summary <- filtering_summary %>%

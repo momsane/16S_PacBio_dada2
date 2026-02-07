@@ -3,3 +3,6 @@ scripts/.DS_Store
 README.html
 scripts/.Rhistory
 .Rhistory
+config/metadata.tsv
+config/pre_rarefaction.tsv
+config/rename_files.tsv
