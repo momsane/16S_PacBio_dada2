@@ -120,7 +120,7 @@ cat(paste0("Primer-free reads written to: ", file.path(out.preproc, "primerfree_
 primer_removal_summary <- foreach(i = seq_along(raw_reads_paths), .packages = c("dada2"), .combine = 'rbind') %dopar% {
   # logging
   con <- file(file.path(out.preproc, "primer_removal.log"), open = "a")
-  writeLines(basename(raw_reads_paths[i]), con)
+  writeLines(paste0(i, " - ", basename(raw_reads_paths[i])), con)
   close(con)
   # rm primers
   res <- removePrimers(fn = raw_reads_paths[i],
@@ -158,7 +158,7 @@ filtered_trimmed_reads_paths <- file.path(out.preproc, "trimmed_filtered_reads",
 track_filtering <- foreach(i = seq_along(trimmed_reads_paths), .packages = c("dada2"), .combine = 'rbind') %dopar% {
   # logging
   con <- file(file.path(out.preproc, "filtering.log"), open = "a")
-  writeLines(basename(trimmed_reads_paths[i]), con)
+  writeLines(paste0(i, " - ", basename(trimmed_reads_paths[i])), con)
   close(con)
   # rm primers
   filterAndTrim(fwd = trimmed_reads_paths[i],
