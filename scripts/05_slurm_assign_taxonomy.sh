@@ -19,7 +19,7 @@ CONDA_HOME=/work/FAC/FBM/DMF/pengel/general_data/mgarci14/miniforge3 # Path to C
 source $CONDA_HOME/etc/profile.d/conda.sh # Source Conda initialization script
 conda activate R # Activate Conda env
 
-# Variables to modify
+# Variables to modify if needed
 root=/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees
 db1="$root"/data/databases/syncom_custom_db_toSpecies_withAmel_trainset.fa
 db2="$root"/data/databases/syncom_custom_db_addSpecies.fa
@@ -50,8 +50,6 @@ echo rarefy_to: "$rarefy_to"
 echo facet_var: "$facet_var"
 echo out.tax: "$out_tax"
 echo out.plots: "$out_plots"
-
-echo "Refer to the Rscript for information on the parameters"
 
 Rscript --vanilla "$script" \
     "$asvs" \

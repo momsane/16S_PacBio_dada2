@@ -19,7 +19,7 @@ CONDA_HOME=/work/FAC/FBM/DMF/pengel/general_data/mgarci14/miniforge3 # Path to C
 source $CONDA_HOME/etc/profile.d/conda.sh # Source Conda initialization script
 conda activate R # Activate Conda env
 
-# Variables to modify/comment
+# Variables to modify/comment if needed
 root=/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees
 #raw_fastq_dir="$root"/data/raw_reads # if you did not pre-rarefy
 raw_fastq_dir="$root"/results/prerarefied_reads # if you pre-rarefied
@@ -27,7 +27,7 @@ fwd_primer=AGRGTTYGATYMTGGCTCAG
 rev_primer=RGYTACCTTGTTACGACTT
 minLen=1400
 maxLen=1600
-maxEE=3 # use 2 for 'normal' PacBio libraries, 3 for Kinnex libraries
+maxEE=4 # use 2 for 'normal' PacBio libraries, 3-4 for Kinnex libraries
 
 # do not modify below this line
 script="$root"/workflow/scripts/02_preprocessing.R
@@ -45,8 +45,6 @@ echo maxLen: "$maxLen"
 echo maxEE: "$maxEE"
 echo out.preproc: "$out_preproc"
 echo out.plots: "$out_plots"
-
-echo "Refer to the Rscript for information on the parameters"
 
 Rscript --vanilla "$script" \
     "$raw_fastq_dir" \
