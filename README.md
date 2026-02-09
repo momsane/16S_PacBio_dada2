@@ -26,7 +26,7 @@ Table of contents
 
 **Important note 2**: depending on the type of library you have and how the fastQ files were produced, you need to select between different options for the filtering and denoising steps. 
 - Consensus sequences from a Kinnex library have less passes, therefore the quality is lower. I would recommend using maxEE=3-4 to avoid being too strict.
-- The CSS software used to infer consensus sequences bins the quality scores to reduce file size, see [here](https://ccs.how/faq/qv-binning.html). If you have such binned quality scores, you need to choose the appropriate function for **denoising** step. 
+- The CSS software used to infer consensus sequences bins the quality scores to reduce file size, see [here](https://ccs.how/faq/qv-binning.html). If you have such binned quality scores, you need to choose the appropriate function for the **denoising** step. 
 
 ### Overview
 
@@ -65,7 +65,7 @@ Set up your working directory:
 ├── logs
 ├── plots
 ├── results
-└── workflow <- git clone https://github.com/momsane/16S_PacBio_dada2
+└── workflow
     ├── config
     ├── envs
     └── scripts
@@ -73,7 +73,7 @@ Set up your working directory:
 
 #### Conda environments
 
-You'll need access to a conda installation on your cluster. You can either have yours, installed for instance through miniforge3, or use the one provided by the cluster. This will change slightly how you activate environments at the beginning of the scripts.
+You'll need access to a conda installation. You can either have yours, installed for instance through miniforge3, or use the one provided by the cluster. This will change slightly how you activate environments at the beginning of the scripts.
 - To use the cluster conda, follow the instructions [here](https://wiki.unil.ch/ci/books/high-performance-computing-hpc/page/using-conda-and-anaconda).
 - To use your own conda installation, you just need to modify the `$CONDA_HOME` variable in the scripts.
 
@@ -81,24 +81,22 @@ Install all the required conda environments using the .yaml files located in the
 
 ### Data Preparation
 
-Before running the pipeline, you need to prepare some data. It is important that each of these tables be in Unix format. If you modify them in Excel for instance, they will not be in Unix format. You can use the command-line tool **dos2unix** to convert them. Make sure also there is a line return after the last line in the table otherwise the last line will not be read.
+Before running the pipeline, you need to prepare some data. All files in `/config` should be tab-separated and in Unix format. The bash scripts include a **dos2unix** command to convert them. Make sure also there is a line return after the last row of the table otherwise it will not be read. Finally, the use of special characters (including spaces) other than _- in file names or tables must be avoided.
 
 1.  **File naming table:** the raw read files you got from the sequencing facility have long non-informative names. If not done already, you will rename them with the SampleID. Create a table like `config/rename_files.tsv` where the first column is the current name of each file, and the second column is the new name. This table has no header. If you have samples from different pools, you will need to create one table per pool because some samples might have the same original name.
-2.  **Metadata file:** modify `config/metadata.tsv` according to your samples. You do not need to keep the same columns except for the first one, `SampleID`. This first column must contain the sample names (filenames without the `.fastq.gz` extension). Make sure there are no empty cells in this table - use NA values if necessary.
-3.  **Read rarefaction table (optional):** if you have very uneven depth in your dataset, you might want to consider rarefying the raw reads to limit unnecessary computation time and resources for large samples. Modify `config/pre_rarefaction.tsv` according to your needs. For bee gut samples, 20,000 reads is way more than enough.
-4.  **Raw reads:** you are now ready to copy them from the NAS. Modify the script `copy_rename_files.sh` with the correct paths. Then execute it from the login node (*i.e.* use `bash` instead of `sbatch` to submit it). If you have samples from different pools, you will need to execute this script independently for each pool.
-5. **Databases:** you need to provide at least one database to assign taxonomy to your ASVs. Refer to [this web page](https://benjjneb.github.io/dada2/training.html) for more information and links to download the databases.
+2.  **Metadata file:** modify `config/metadata.tsv` according to your samples. You do not need to keep the same columns except for the first one, `SampleID`. This first column must contain the sample names (final filenames without the `.fastq.gz` extension). Make sure there are no empty cells in this table - use NA values if necessary.
+3.  **Read rarefaction table (optional):** if you have very uneven depth in your dataset, you might want to consider rarefying the raw reads to limit unnecessary computation time and resources for large samples. Modify `config/pre_rarefaction.tsv` according to your needs.
+4.  **Raw reads:** you are now ready to copy them from the NAS. Modify the script `00_copy_rename_files.sh` with the correct paths. Then execute it from the login node (*i.e.* use `bash` instead of `sbatch` to submit it). If you have samples from different pools, you will need to execute this script independently for each pool.
+5. **Databases:** you need to provide at least one database to assign taxonomy to your ASVs. Refer to [the dada2 website](https://benjjneb.github.io/dada2/training.html) for more information and links to download the databases.
 
 ### Adapting the scripts
 
-Only the `.sh` scripts need to be modified. You will need to modify only the beginning of these scripts:
+Only the beginning of the `.sh` scripts needs to be modified:
 
 - the commands to initialize conda according to the type of installation you are using
 - the input variables, for instance the path to the root directory
 - the pre-rarefaction and the fastQC scripts are array jobs (argument `--array` in the slurm header), so you need to modify the range of the arrays. `2-50` means you will process files described in lines 2 to 50 of `config/metadata.tsv`. We start at 2 to skip the header. So your array range should be `2-<number of samples + 1>`
-- you should not need to modify the resource requirements, unless your jobs get killed.
-
-On top of this, each script requires customization of some script-specific variables. For instance, in `01_fastqc_preproc.sh` and `02_slurm_preprocessing.sh` you must modify the `reads` variable, depending on whether you did the pre-rarefaction step.
+- you should not need to modify the resource requirements, unless your jobs get killed. Before increasing memory and CPU requests, check the efficiency of your job using `seff <jobid>`.
 
 ### Running the pipeline
 
@@ -106,18 +104,19 @@ On top of this, each script requires customization of some script-specific varia
 
 To run the other scripts:
 
-1.  **Submit the job to the slurm scheduler:** use `sbatch <script_name>.sh`.
-2.  **Monitor the job:** use `Squeue` to check the status of you jobs. After each step, check the logs for errors. 
+1.  **Submit the job to the slurm scheduler:** `sbatch <script_name>.sh`.
+2.  **Monitor the job:** use `Squeue` to check the status of you jobs. **Check the log file after each step**: it will contain not only any error messages but also useful information. 
     
 | Script           | What to check                                       |
 |--------------------|---------------------------------------------------|
+| `00_copy_rename_files.sh`        | All files have been copied; use `ls -la` to check that file names don't contain special characters                            |
 | `00_rarefy.sh`        | Size of output fastQ files is > 0                            |
 | `01_fastqc_preproc.sh` & `03_fastqc_postproc.sh`      | Output folders are not empty                            |
-| `01_multiqc_preproc.sh` & `03_multiqc_postproc.sh`            | Look at HTML report                  |
-| `02_slurm_preprocessing.sh`            | Check for errors in log; check number of fastQ files in results/preprocessing/primerfree_reads & results/preprocessing/trimmed_filtered_reads; check output plots                  |
-| `04_slurm_denoising.sh`            | Check for errors in log; check output plots                  |
-| `05_slurm_assign_taxonomy.sh`            | Check for errors in log; check output plots                  |
-| `06_slurm_quantify_strains.sh`            | Check for errors in log; check output plots                  |
+| `01_multiqc_preproc.sh` & `03_multiqc_postproc.sh`            | Log file indicates the expected of reports has been found; look at HTML report                  |
+| `02_slurm_preprocessing.sh`            | Check log and plots; check number of fastQ files in results/preprocessing/primerfree_reads & results/preprocessing/trimmed_filtered_reads;                  |
+| `04_slurm_denoising.sh`            | Check log and plots                  |
+| `05_slurm_assign_taxonomy.sh`            | Check log and plots                  |
+| `06_slurm_quantify_strains.sh`            | Check log and plots                  |
 
 
 **Note 1:** the first time you run `02_slurm_preprocessing.sh` and `05_slurm_assign_taxonomy.sh`, some R packages will be installed. The execution might be halted with an error message after the last installation. This is because the R environment needs to be reloaded. Simply run the script again and it should work.
@@ -129,7 +128,7 @@ To run the other scripts:
 
 ## Creating a custom database for defined communities
 
-This can be done entirely on your local computer. It is highly recommended to use 16S sequences from PacBio sequencing (WGS or amplicon) because 16S inference with Illumina or ONT genomes can be inaccurate.
+This can be done entirely on a regular computer. It is highly recommended to use 16S sequences from PacBio sequencing (WGS or amplicon) because 16S inference with Illumina or ONT genomes can be inaccurate.
 
 ### Install required tools
 

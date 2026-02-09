@@ -22,8 +22,8 @@ conda activate qc # Activate Conda env
 
 # Variables to modify/comment
 root=/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees
-# reads="$root"/data/raw_reads 
-reads="$root"/results/prerarefied_reads
+# reads="$root"/data/raw_reads # if you did not pre-rarefy
+reads="$root"/results/prerarefied_reads # if you pre-rarefied
 
 # do not modify below this line
 metadata="$root"/workflow/config/metadata.tsv

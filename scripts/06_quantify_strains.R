@@ -133,10 +133,14 @@ clusters3 <- clusters3[ ,-1]
 clusters3[is.na(clusters3)] <- 0
 
 # make sure ASVs are ordered the same way in both matrices
-length(symdiff(rownames(tab2), rownames(clusters3))) # should be 0
+cat("The following number should be equal to zero: ")
+cat(length(symdiff(rownames(tab2), rownames(clusters3)))) # should be 0
+cat("\n")
 clusters3 <- clusters3[rownames(tab2), ]
 match <- rownames(clusters3) == rownames(tab2)
-length(match[match==FALSE]) # should be 0
+cat("The following number should be equal to zero: ")
+cat(length(match[match==FALSE])) # should be 0
+cat("\n")
 
 set.seed(42)
 # solve the strain by sample matrix 
@@ -221,7 +225,18 @@ generate_palette <- function(df) {
 }
 
 
-pal <- generate_palette(unique(df[ ,c("Genus", "label")]))
+pal <- generate_palette(unique(df[ ,c("Genus", "label")])) %>% 
+  left_join(unique(df[ ,c("Strain", "label")]), by = "label")
+
+# save palette
+write.table(
+  pal,
+  file.path(out.quant, "color_palette.tsv"),
+  sep = "\t",
+  col.names = T,
+  row.names = F,
+  quote = F
+)
 
 # read counts
 p1 <- ggplot(

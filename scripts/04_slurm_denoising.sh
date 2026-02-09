@@ -21,14 +21,14 @@ conda activate R # Activate Conda env
 
 # Variables to modify
 root=/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees
-errModel=binnedQualErrfun # use `binnedQualErrfun` if you have binned quality score, or else `PacBioErrfun`
-maxReads=1000000 # 1E6 strongly recommended
-maxBases=10000000000 # 1E10 strongly recommended
+errModel=binnedQualErrfun # use 'binnedQualErrfun' if you have binned quality score, or else 'PacBioErrfun'
 db2="$root"/data/databases/syncom_custom_db_addSpecies.fa # give dada a set of expected ASVs, or set to ""
 pool=F # "T" or "pseudo" or "F", whether to pool samples for ASV inference
-maxraref=8000 # use the multiqc output to set this value close to the max number of reads in a sample
+maxraref=40000 # use the multiqc output to set this value close to the highest number of reads in your samples
 
-# do not modify below this line
+# do not modify below this line, unless you know what you are doing
+maxReads=1000000 # reduce if memory issues arise
+maxBases=10000000000 # 1E10 strongly recommended
 script="$root"/workflow/scripts/04_denoising.R
 out_denois="$root"/results/denoising
 out_plots="$root"/plots
@@ -48,8 +48,6 @@ echo pool: "$pool"
 echo maxraref: "$maxraref"
 echo out.denois: "$out_denois"
 echo out.plots: "$out_plots"
-
-echo "Refer to the Rscript for information on the parameters"
 
 Rscript --vanilla "$script" \
     "$processed_fastq_dir" \

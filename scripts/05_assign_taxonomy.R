@@ -97,7 +97,7 @@ if (length(args) != 10){
 # input.asvs <- file.path(root, "results", "denoising", "ASV_samples_table_noChim.rds")
 # input.metadata <- file.path(root, "workflow", "config", "metadata.tsv")
 # input.readcounts <- file.path(root, "results", "denoising", "read_counts_steps.tsv")
-# db1 <- file.path(root, "data", "databases", "amplicon_based_db/syncom_custom_db_toSpecies_trainset.fa")
+# db1 <- file.path(root, "data", "databases", "amplicon_based_db/syncom_custom_db_toSpecies_withAmel_trainset.fa")
 # db2 <- file.path(root, "data", "databases", "amplicon_based_db/syncom_custom_db_addSpecies.fa")
 # min_boot <- 50
 # rarefy_to <- -1
@@ -318,7 +318,7 @@ tax <- tax_table(as.matrix(ASV_taxonomy4))
 check_match <- setdiff(rownames(otu), rownames(sdata))
 
 if (length(check_match) != 0){
-  cat(paste0("Non-matching sample name(s) between the ASV table and the metadata table: ", paste0(check_match, collapse = ",")))
+  cat(paste0("Non-matching sample name(s) between the ASV table and the metadata table: ", paste0(check_match, collapse = ","), "\n"))
 }
 
 ps <- phyloseq(otu, 
@@ -343,9 +343,9 @@ ps <- subset_taxa(ps, !(Class == "Chloroplast") | is.na(Class))
 ps <- subset_taxa(ps, !(Order == "Chloroplast") | is.na(Order))
 ps <- subset_taxa(ps, !(Family == "Mitochondria") | is.na(Family))
 
-cat(paste0("Found and removed ", length(which(!(ASV_taxonomy3[,1] == "Bacteria"))), " non-bacterial ASV(s)\n"))
-cat(paste0("Found and removed ", length(which(ASV_taxonomy3[,3] == "Chloroplast"))+length(which(ASV_taxonomy[,4] == "Chloroplast")), " chloroplast ASV(s)\n"))
-cat(paste0("Found and removed ", length(which(ASV_taxonomy3[,5] == "Mitochondria")), " mitochondrial ASV(s)\n"))
+cat(paste0("Found and removed ", length(which(!(ASV_taxonomy3[["Kingdom"]] == "Bacteria"))), " non-bacterial ASV(s)\n"))
+cat(paste0("Found and removed ", length(which(ASV_taxonomy3[["Class"]] == "Chloroplast"))+length(which(ASV_taxonomy3[["Order"]] == "Chloroplast")), " chloroplast ASV(s)\n"))
+cat(paste0("Found and removed ", length(which(ASV_taxonomy3[["Family"]] == "Mitochondria")), " mitochondrial ASV(s)\n"))
 
 # save sequences and give new names to ASVs
 dna <- DNAStringSet(taxa_names(ps))
@@ -431,6 +431,15 @@ ggsave(
   width = 6,
   height = 5
 )
+## save data
+write.table(
+  bootstraps,
+  file.path(out.tax, "rdp_bootstraps.tsv"),
+  sep = "\t",
+  quote = F,
+  col.names = T,
+  row.names = F
+)
 
 ### Create a single abundance table ###
 
@@ -442,7 +451,14 @@ abundance_table_long <- psmelt(ps) %>%
   ) %>%
   arrange(SampleID, ASV)
 
-write.table(abundance_table_long, file.path(out.tax, "sample_ASV_table_long.tsv"), sep = "\t", quote = F, col.names = T, row.names = F)
+write.table(
+  abundance_table_long,
+  file.path(out.tax, "sample_ASV_table_long.tsv"),
+  sep = "\t",
+  quote = F,
+  col.names = T,
+  row.names = F
+)
 
 ### Compute ASV total abundance and prevalence ###
 

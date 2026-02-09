@@ -148,18 +148,6 @@ cat("Denoising into ASVs\n")
 # pooling T/pseudo/F
 # priors yes/no
 
-# run_dada_single <- function(dereplicated_seqs, errM = error_model, priors_db = db2){
-#   # with priors
-#   if (priors_db != ""){
-#     my_priors <- getSequences(priors_db)
-#     return(dada(dereplicated_seqs, err=errM, multithread=TRUE, verbose = T, priors = my_priors))
-#   }
-#   # without priors
-#   else {
-#     return(dada(dereplicated_seqs, err=errM, multithread=TRUE, verbose = T))
-#   }
-# }
-
 if (db2 == ""){
   cat("No priors given\n")
   if (pool=="T"){
