@@ -39,7 +39,7 @@ Steps of the pipeline:
 - quality check on the processed reads `03_fastqc_postproc.sh` and `03_multiqc_posteproc.sh`
 - denoising into ASVs with dada2 `04_slurm_denoising.sh`
 - taxonomy assignment with dada2 `05_slurm_assign_taxonomy.sh`
-- *(only for defined communities)* compute strain abundance from ASV table `06_slurm_quantify_strains.sh`.
+- *(only for defined communities)* compute genome equivalents from ASV table `06_slurm_quantify_strains.sh`, with or without qPCR data.
 
 dada2 is implemented in Rscripts called by the bash scripts. **There should not be any need to modify the R scripts**.
 
