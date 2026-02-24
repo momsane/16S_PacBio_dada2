@@ -82,18 +82,24 @@ reads_df <- read.table(input.readcounts, sep = "\t", header = T)
 
 ### Dereplicate sequences ###
 
-cat("Dereplicating sequences\n")
-
-dereps <- derepFastq(filtered_trimmed_reads_paths, verbose=TRUE, n = maxReads)
-
-cat("Dereplication done\n")
+# if its exists, load pre-existing dereplication object
+if (file.exists(file.path(out.denois, "dereps.RDS"))){
+  cat("Loading pre-existing dereplication object\n")
+  dereps <- readRDS(file.path(out.denois, "dereps.RDS"))
+} else {
+  cat("Dereplicating sequences\n")
+  dereps <- derepFastq(filtered_trimmed_reads_paths, verbose=TRUE, n = maxReads)
+  saveRDS(dereps, file.path(out.denois, "dereps.RDS"))
+  cat("Dereplication done\n")
+}
 
 
 ### Build error model ###
 
-cat("Building error model\n")
-
-set.seed(42)
+# utility
+checkConvergence <- function(dadaO) {
+  sapply(dadaO$err_in, function(x) sum(abs(dadaO$err_out-x)))
+}
 
 # sample quality scores from 5 random samples to check whether they are binned or not
 quals <- c()
@@ -105,40 +111,50 @@ cat("Quality scores detected in the trimmed and filtered reads (five randomly ch
 cat(sort(quals))
 cat("\n")
 
-if (errModel == "binnedQualErrfun"){
-  cat("Building error model with bins [3, 10, 17, 22, 27, 35, 40]\n")
-  binnedQs <- c(3, 10, 17, 22, 27, 35, 40)
-  binnedQualErrfun <- makeBinnedQualErrfun(binnedQs)
-  error_model <- learnErrors(
-    dereps,
-    errorEstimationFunction = binnedQualErrfun,
-    nbases = maxBases,
-    randomize = T,
-    BAND_SIZE = 32,
-    multithread = T,
-    verbose = T
-  )
-} else if (errModel == "PacBioErrfun") {
-  cat("Building error model with standard PacBio model\n")
-  error_model <- learnErrors(
-    dereps,
-    errorEstimationFunction = PacBioErrfun,
-    nbases = maxBases,
-    randomize = T,
-    BAND_SIZE = 32,
-    multithread = T,
-    verbose = T
-  )
+
+# if its exists, load pre-existing error model
+if (file.exists(file.path(out.denois, "dada2_error_model.RDS"))){
+  cat("Loading pre-existing error model\n")
+  error_model <- readRDS(file.path(out.denois, "dada2_error_model.RDS"))
+} else {
+  cat("Building error model\n")
+  
+  set.seed(42)
+  
+  if (errModel == "binnedQualErrfun"){
+    cat("Building error model with bins [3, 10, 17, 22, 27, 35, 40]\n")
+    binnedQs <- c(3, 10, 17, 22, 27, 35, 40)
+    binnedQualErrfun <- makeBinnedQualErrfun(binnedQs)
+    error_model <- learnErrors(
+      dereps,
+      errorEstimationFunction = binnedQualErrfun,
+      nbases = maxBases,
+      randomize = T,
+      BAND_SIZE = 32,
+      multithread = T,
+      verbose = T
+    )
+  } else if (errModel == "PacBioErrfun") {
+    cat("Building error model with standard PacBio model\n")
+    error_model <- learnErrors(
+      dereps,
+      errorEstimationFunction = PacBioErrfun,
+      nbases = maxBases,
+      randomize = T,
+      BAND_SIZE = 32,
+      multithread = T,
+      verbose = T
+    )
+  }
+  saveRDS(error_model, file.path(out.denois, "dada2_error_model.RDS"))
+  cat("Error model built\n")
 }
+
+cat("Error model residuals:\n")
+print(checkConvergence(error_model))
 
 err.plot <- plotErrors(error_model, nominalQ=TRUE)
 ggsave(file.path(out.plots, paste0("04_error_plot_", errModel, ".pdf")), err.plot, device="pdf", width = 10, height = 8)
-
-saveRDS(error_model, file.path(out.denois, "dada2_error_model.RDS"))
-
-cat("Error model built\n")
-
-# error_model <- readRDS(file = file.path(out.denois, "dada2_error_model.RDS"))
 
 ### ASV inference ###
 
@@ -182,7 +198,6 @@ cat("Denoising done\n")
 
 cat("Generating ASV table\n")
 
-# dds <- readRDS(file = file.path(out.denois, "denoised_seqs.rds"))
 ASV_samples_table <- makeSequenceTable(dds)
 
 cat(paste0("Found ", ncol(ASV_samples_table), " ASVs across the ", nrow(ASV_samples_table), " samples", "\n"))

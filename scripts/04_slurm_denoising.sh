@@ -3,10 +3,10 @@
 #SBATCH --account pengel_general_data
 #SBATCH --nodes 1
 #SBATCH --ntasks 1
-#SBATCH --cpus-per-task 5
-#SBATCH --mem 32000
+#SBATCH --cpus-per-task 6
+#SBATCH --mem 64000
 #SBATCH --partition cpu
-#SBATCH --time 07:00:00
+#SBATCH --time 24:00:00
 #SBATCH --error /work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees/logs/04_denoising.log
 #SBATCH --output /work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees/logs/04_denoising.log
 

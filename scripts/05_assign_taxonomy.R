@@ -38,11 +38,6 @@ if(!require(dada2)){
   library(dada2)
 }
 
-if(!require(GUniFrac)){
-  install.packages(pkgs = 'GUniFrac', repos = 'https://stat.ethz.ch/CRAN/')
-  library(GUniFrac)
-}
-
 if(!require(Biostrings)){
   install.packages(pkgs = 'Biostrings', repos = 'https://stat.ethz.ch/CRAN/')
   library(Biostrings)
@@ -93,7 +88,7 @@ if (length(args) != 10){
   out.plots <- args[10] # folder to write plots
 }
 
-# root <- "/Volumes/RECHERCHE/FAC/FBM/DMF/pengel/general_data/D2c/mgarcia/20240708_mgarcia_syncom_assembly/pacbio_analysis/run1_bees"
+# root <- "/Volumes/RECHERCHE/FAC/FBM/DMF/pengel/general_data/D2c/mgarcia/20240708_mgarcia_syncom_assembly/pacbio_analysis/run1_MD_bees"
 # input.asvs <- file.path(root, "results", "denoising", "ASV_samples_table_noChim.rds")
 # input.metadata <- file.path(root, "workflow", "config", "metadata.tsv")
 # input.readcounts <- file.path(root, "results", "denoising", "read_counts_steps.tsv")
@@ -129,39 +124,12 @@ rownames(meta) = meta$SampleID
 
 reads_df <- read.table(input.readcounts, sep = "\t", header = T)
 
-### Rarefy reads if needed ###
-
-if (rarefy_to <= 0){
-  cat("No rarefaction\n")
-  ASV_samples_table_noChim2 <- ASV_samples_table_noChim
-} else {
-  # rarefy reads
-  cat(paste0("Rarefaction to ", rarefy_to, " reads; samples with fewer reads will be removed; ASVs with a subsequent total abundance of 0 will be removed\n"))
-  set.seed(42)
-  raref <- Rarefy(ASV_samples_table_noChim, depth = rarefy_to)
-  ASV_samples_table_noChim2 <- raref$otu.tab.rff 
-  # list samples that are removed
-  cat(paste0("Rarefaction removed the following samples: ", paste0(raref$discard, collapse = ", "), "\n"))
-  
-  # find ASVs with total abundance of 0
-  ab <- apply(ASV_samples_table_noChim2, 2, sum)
-  cat(paste0("Rarefaction led to ", length(names(ab[ab == 0])), " ASVs being removed\n"))
-  
-  # save these ASVs somewhere
-  seqs <- DNAStringSet(names(ab[ab == 0]))
-  names(seqs) <- seq_along(seqs)
-  writeXStringSet(seqs, file.path(out.tax, "ASV_removed_rarefaction.fna"), format="fasta")
-  
-  # remove the ASVs from table
-  ASV_samples_table_noChim2 <- ASV_samples_table_noChim2[ ,setdiff(colnames(ASV_samples_table_noChim2), names(ab[ab == 0]))]
-}
-
 ### Assign taxonomy ###
 
 cat(paste0("Using database ", db1, " to assign taxonomy\n"))
 
 taxonomy_object <- assignTaxonomy(
-  seqs = ASV_samples_table_noChim2,
+  seqs = ASV_samples_table_noChim,
   refFasta = db1,
   minBoot = min_boot,
   outputBootstraps = TRUE,
@@ -224,7 +192,7 @@ addSpecies_custom <- function(seqs, refFasta) {
 
 if (db2 != ""){
   cat(paste0("Using database ", db2, " to assign species\n"))
-  ASV_taxonomy2 <- addSpecies_custom(seqs = ASV_samples_table_noChim2, refFasta = db2) %>% 
+  ASV_taxonomy2 <- addSpecies_custom(seqs = ASV_samples_table_noChim, refFasta = db2) %>% 
     separate(ref_match, into = c("Species_addSp", "Strain", "Cluster"), sep = "-", remove = T) %>% 
     separate(Species_addSp, into = c("Genus_addSp", "Species_addSp"), sep = " ") %>% 
     select(-"ASV_index")
@@ -310,7 +278,7 @@ ASV_taxonomy4 <- ASV_taxonomy3 %>%
 
 cat("Creating phyloseq object\n")
 
-otu <- otu_table(ASV_samples_table_noChim2, taxa_are_rows=F)
+otu <- otu_table(ASV_samples_table_noChim, taxa_are_rows=F)
 sdata <- sample_data(meta)
 tax <- tax_table(as.matrix(ASV_taxonomy4))
 
@@ -368,7 +336,7 @@ dna_df <- data.frame(
 
 write.table(dna_df, file.path(out.tax, "ASV_name_tax.tsv"), sep = "\t", col.names = T, row.names = F, quote = F)
 
-saveRDS(object = ps, file = file.path(out.tax, "phyloseq_object_filtered.RDS"))
+saveRDS(object = ps, file = file.path(out.tax, "phyloseq_object_filtered_nonrarefied.RDS"))
 
 cat("Finished creating and filtering phyloseq object\n")
 
@@ -441,9 +409,36 @@ write.table(
   row.names = F
 )
 
+### Rarefy reads if needed ###
+
+if (rarefy_to <= 0){
+  cat("No rarefaction\n")
+  ps.final <- ps
+  
+} else {
+  
+  # rarefy reads
+  cat(paste0("Rarefaction to ", rarefy_to, " reads; samples with fewer reads will be removed; ASVs with a subsequent total abundance of 0 will be not removed\n"))
+  ps.raref <- rarefy_even_depth(ps, sample.size=rarefy_to, replace=F, trimOTUs = F, rngseed = 42, verbose=F)
+  
+  # list samples that are removed
+  samples_diff <- setdiff(
+    colnames(otu_table(ps)),
+    colnames(otu_table(ps.raref))
+  )
+  cat(paste0("Rarefaction removed the following samples: ", paste0(samples_diff, collapse = ", "), "\n"))
+  
+  # find ASVs with total abundance of 0
+  ab <- apply(otu_table(ps.raref), 1, sum)
+  cat(paste0(length(names(ab[ab == 0])), " ASVs have a total abundance of zero\n"))
+  
+  saveRDS(object = ps.raref, file = file.path(out.tax, "phyloseq_object_filtered_rarefied.RDS"))
+  ps.final <- ps.raref
+}
+
 ### Create a single abundance table ###
 
-abundance_table_long <- psmelt(ps) %>% 
+abundance_table_long <- psmelt(ps.final) %>% 
   select(-"Sample") %>% 
   dplyr::rename(
     ASV = OTU,
@@ -556,7 +551,7 @@ write.table(counts2, file.path(out.tax, "read_count_wide.tsv"), sep = "\t", quot
 cat("\nPlotting most abundant taxa\n")
 
 top_nested <- nested_top_taxa(
-  ps,
+  ps.final,
   top_tax_level = "Genus", # most abundant order
   nested_tax_level = "Species", # most abundant genera within those orders
   n_top_taxa = 8, # top 8 most abundant genera
@@ -568,7 +563,7 @@ tax_plot <- plot_nested_bar(ps_obj = top_nested$ps_obj,
                             legend_title = "Taxonomy") + 
   theme_nested(theme_classic) + ylab("Relative abundance") + 
   theme(
-    #strip.text.x = element_text(angle=90),
+    strip.text.x = element_text(angle=90, hjust=0, vjust=0.5),
     strip.background=element_blank(),
     axis.title.x=element_blank(),
     axis.text.x=element_blank(),
@@ -578,7 +573,7 @@ tax_plot <- plot_nested_bar(ps_obj = top_nested$ps_obj,
   guides(fill=guide_legend(ncol =1))
 
 if (facet_var[1] != ""){
-  tax_plot <- tax_plot + facet_wrap(formula(paste0("~ ", paste(facet_var, collapse = "+"))), drop=T, scales = "free")
+  tax_plot <- tax_plot + facet_wrap(formula(paste0("~ ", paste(facet_var, collapse = "+"))), drop=T, scales = "free_x", space = "free_x")
 }
 
 ggsave(file.path(out.plots, "05_taxonomy_barplot.pdf"), tax_plot, device="pdf", width = 8, height = 6)

@@ -27,6 +27,9 @@ reads="$root"/results/prerarefied_reads # if you pre-rarefied
 
 # do not modify below this line
 metadata="$root"/workflow/config/metadata.tsv
+
+dos2unix "$metadata"
+
 sample=$(awk -v ArrayTaskID=${SLURM_ARRAY_TASK_ID} 'NR==ArrayTaskID {print $1}' "$metadata") 
 out="$root"/results/fastqc_preproc/"$sample"
 
