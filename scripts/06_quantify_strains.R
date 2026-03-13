@@ -69,7 +69,7 @@ if (length(args) != 8){
 # input.ps <- file.path(root, "results", "assign_taxonomy", "phyloseq_object_filtered_nonrarefied.RDS")
 # input.clusters <- file.path(root, "workflow", "config", "all_16S_cd-hit_clusters_tax_full.tsv")
 # input.qpcr <- "/Volumes/RECHERCHE/FAC/FBM/DMF/pengel/general_data/D2c/mgarcia/20240708_mgarcia_syncom_assembly/absolute_quantification_results/qPCR_results_analyzed.tsv"
-# abundance_col <- "normalized_16S_copies_gut"
+# abundance_col <- "normalized_16S_copies"
 # facet_var <- "SampleType"
 # maxraref <- -1
 # out.quant <- file.path(root, "results", "quantify_strains")
@@ -152,7 +152,7 @@ if ((input.qpcr != "") & (abundance_col != "")){
     mutate(ASV_abs_abun = round(rel_abun*.data[[abundance_col]]), .after="rel_abun")
   
   # extract samples with no absolute abundance
-  samples_noqpcr <- unique(long$SampleID[is.na(long$normalized_16S_copies_gut)])
+  samples_noqpcr <- unique(long$SampleID[is.na(long[[abundance_col]])])
   
   if (length(samples_noqpcr) != 0){
     cat("The samples below do not have any qPCR data. Strain counts will be computed separately and based on read counts.\n")
