@@ -3,10 +3,10 @@
 #SBATCH --account pengel_general_data
 #SBATCH --nodes 1
 #SBATCH --ntasks 1
-#SBATCH --cpus-per-task 4
-#SBATCH --mem 64000
+#SBATCH --cpus-per-task 8
+#SBATCH --mem 40000
 #SBATCH --partition cpu
-#SBATCH --time 02:00:00
+#SBATCH --time 04:00:00
 #SBATCH --error /work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees/logs/02_preprocessing.log
 #SBATCH --output /work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees/logs/02_preprocessing.log
 
@@ -28,6 +28,7 @@ rev_primer=RGYTACCTTGTTACGACTT
 minLen=1400
 maxLen=1600
 maxEE=4 # use 2 for 'normal' PacBio libraries, 3-4 for Kinnex libraries
+overwrite=F # whether to overwrite potential existing files or not; useful if your job did not finish in time
 
 # do not modify below this line
 script="$root"/workflow/scripts/02_preprocessing.R
@@ -43,6 +44,7 @@ echo rev.primer: "$rev_primer"
 echo minLen: "$minLen"
 echo maxLen: "$maxLen"
 echo maxEE: "$maxEE"
+echo overwrite: "$overwrite"
 echo out.preproc: "$out_preproc"
 echo out.plots: "$out_plots"
 
@@ -53,6 +55,7 @@ Rscript --vanilla "$script" \
     "$minLen" \
     "$maxLen" \
     "$maxEE" \
+    "$overwrite" \
     "$out_preproc" \
     "$out_plots"
 

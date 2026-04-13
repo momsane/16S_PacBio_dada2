@@ -220,16 +220,15 @@ cat("Note: only ASVs matching the provided custom database will be used to infer
 # make matrix B
 
 ## remove ASV clusters that the user does not want to use for quantification
-cls_use <- clusters$cluster[clusters$use_to_quantify == TRUE]
-## keep only ASVs matching a syncom ASV and used for quantification
+cls_use <- clusters$cluster[!is.na(clusters$n_copies)]
+## keep only ASVs matching a syncom ASV and with known copy number
 asv_cls <- sort(unique(tax$ASV[tax$inferred_from == "addSpecies_custom" & tax$Cluster %in% cls_use]))
 
 ## get number of ASV copy per strain
 clusters2 <- clusters %>% 
   filter(cluster %in% cls_use) %>%
-  group_by(cluster, strain) %>% 
-  summarize(n = n()) %>% 
-  pivot_wider(names_from = strain, values_from = n)
+  select(all_of(c("cluster", "strain", "n_copies"))) %>%
+  pivot_wider(names_from = strain, values_from = n_copies)
 ## convert to matrix = B
 clusters3 <- as.matrix(clusters2)
 rownames(clusters3) <- clusters3[ ,1]

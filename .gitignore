@@ -6,3 +6,4 @@ scripts/.Rhistory
 config/metadata.tsv
 config/pre_rarefaction.tsv
 config/rename_files.tsv
+scripts/make_custom_db_script.sh

@@ -132,21 +132,23 @@ This can be done entirely on a regular computer. It is highly recommended to use
 
 ### Install required tools
 
-Create and activate the following conda environment:
+Create and activate the following conda environment and define file names for the workflow:
 ```
 conda create custom_db_dada2 bioconda::seqkit bioconda::cd-hit conda-forge::dos2unix
 conda activate custom_db_dada2
+prefix=all_16S_cd-hit
+dbprefix=syncom_custom_db
 ```
 
 ### Merging and dereplicating 16S sequences
 
-1. Put all 16S sequences in a single folder called `individual_16S`. **Each sequence must have a unique ID containing the strain name.**
+1. If needed:
+  - put all 16S sequences in a single folder called `individual_16S`. **Each sequence must have a unique ID containing the strain name.**
+  - concatenate the sequences: `cat individual_16S/*.fna >> all_16S.fna`.
 
-2. Concatenate the sequences: `cat individual_16S/*.fna >> all_16S.fna`.
+2. Dereplicate sequences at 100% identity threshold: `cd-hit-est -i all_16S.fna -o "$prefix" -c 1 -n 10 -d 0`.
 
-3. Run `cd-hit-est` with 100% identity threshold: `cd-hit-est -i all_16S.fna -o all_16S_cd-hit -c 1 -n 10 -d 0`.
-
-4. Parse the `.clstr` output into a table:
+3. Parse the `.clstr` output into a table:
 ```
 awk '
 BEGIN { print "cluster\tsequence"}
@@ -162,66 +164,80 @@ BEGIN { print "cluster\tsequence"}
     gsub(/\.{3}/, "", seq)
     print cluster "\t" seq
 }
-' all_16S_cd-hit.clstr > all_16S_cd-hit_clusters.tsv
+' "$prefix".clstr > "$prefix"_clusters.tsv
 ```
 
-5. Open `all_16S_cd-hit_clusters.tsv` in Excel or a text editor and check that each cluster contains only sequences from the same strain. If it is not the case, this is fine. You will just need to keep in mind later that some ASVs cannot be used to quantify the abundance of your strains.
+4. Open the `_clusters.tsv` table in Excel or a text editor and check that each cluster contains only sequences from the same strain. If it is not the case, this is fine. You will just need to keep in mind later that some ASVs cannot be used to quantify the abundance of your strains.
 
 You are now in possession of a dereplicated database of all the 16S amplicons of your community. But we still need to **(1)** generate versions of this database with correctly formatted headers for dada2 **(2)** merge these new versions with existing databases to use with `assignTaxonomy()` **(3)** generate a version of this database with only the species name to use with `addSpecies()`.
 
 ### Formatting databases for dada2
 
-6. Prepare a file to change the sequence IDs in `all_16S_cd-hit` to reflect the cluster name. We just need to swap the columns in `all_16S_cd-hit_clusters.tsv` and remove the header:
+5. Change the sequence IDs in the fasta file to reflect the cluster name:
 ```
-awk 'BEGIN { FS = OFS = "\t" }; NR > 1 { print $2, $1 }' all_16S_cd-hit_clusters.tsv > all_16S_cd-hit_clusters_rename.tsv
+awk 'BEGIN { FS = OFS = "\t" }; NR > 1 { print $2, $1 }' "$prefix"_clusters.tsv > "$prefix"_clusters_rename.tsv
+seqkit replace -p '^(\S+)' -r '{kv}$2' -k "$prefix"_clusters_rename.tsv "$prefix" > "$prefix"_renamed.fna
 ```
 
-7. Change the sequence IDs in `all_16S_cd-hit`: `seqkit replace -p '^(\S+)' -r '{kv}$2' -k all_16S_cd-hit_clusters_rename.tsv all_16S_cd-hit > all_16S_cd-hit_renamed.fna`.
-
-8. 
-    - Create a copy of `all_16S_cd-hit_clusters.tsv` named `all_16S_cd-hit_clusters_tax_full.tsv`: `cp all_16S_cd-hit_clusters.tsv all_16S_cd-hit_clusters_tax_full.tsv`.
+6. 
+    - Create a copy of the clusters table: `cp "$prefix"_clusters.tsv "$prefix"_clusters_tax_full.tsv`.
     - Open it in excel, and add a third column `taxonomy_full` with the full taxonomy of your strains. If you will merge it with GreenGenes2, it must be in GTDB-like taxonomy format, like *d__Bacteria;p__Bacillota_I;c__Bacilli_A;o__Lactobacillales;f__Lactobacillaceae;g__Bombilactobacillus;s__Bombilactobacillus mellifer*. If you are merging with SILVA, the format would be *Bacteria;Bacillota;Bacilli;Lactobacillales;Lactobacillaceae;Bombilactobacillus;mellifer;*.
     - Use `TEXTSPLIT` from excel to get a fourth column `taxonomy_genus` with only the taxonomy down to genus (keeping a semi-colon at the end), and a fifth column `genus_species` with the full species name.
     - Create a sixth column `strain` with the strain name.
-    - Append the strain name and cluster number to `genus_species` using "-" as a delimiter.
+    - Append the strain name and cluster number to the existing `genus_species` column using "-" as a delimiter.
     - Create a seventh column `taxonomy_species` that is basically the same as `taxonomy_full` but you remove the genus in the species name.
-    - Create an eighth column `use_to_quantify` indicating whether this specific sequence can be used to quantify your strains. Put `FALSE` if the number of copies of this sequence in your strain is unclear.
-    - See the attached example for merging with GreenGenes2. Once you are done editing it, make sure it is **tab-delimited** and in **Unix format** `dos2unix all_16S_cd-hit_clusters_tax_full.tsv`.
+    - Create an eighth column `n_copies` indicating the number of copies of this specific ASV in the given strain. Put NA if you don't know.
+    - See the example in `config` with GreenGenes2 format. Once you are done editing it, make sure it is **tab-delimited** and in **Unix format** `dos2unix "$prefix"_clusters_tax_full.tsv`.
 
-9. Make a copy of `all_16S_cd-hit_clusters_tax_full.tsv` with only columns 1 and 4, remove the header, and remove redundant lines: `awk ' BEGIN { FS = OFS = "\t" }; NR > 1 {print $1, $4}' all_16S_cd-hit_clusters_tax_full.tsv | sort -k1,1 | uniq > all_16S_cd-hit_clusters_tax_genus.txt`. Now you should end up with a table reporting the genus-level taxonomy of each cluster. You might have had several different strains in one cluster at **step 5**, but they should still all belong to the same genus, therefore each cluster should appear only once in the table.
+7. Next we prepare some files to generate the toGenus and toSpecies databases:
+```
+awk ' BEGIN { FS = OFS = "\t" }; NR > 1 {print $1, $4}' "$prefix"_clusters_tax_full.tsv | sort -k1,1 | uniq > "$prefix"_clusters_tax_genus.txt 
+awk ' BEGIN { FS = OFS = "\t" }; NR > 1 {print $1, $7}' "$prefix"_clusters_tax_full.tsv | sort -k1,1 | uniq > "$prefix"_clusters_tax_species.txt
+```
+In these tables, if a cluster appears twice but with different taxonomy (an ASV present in two different species for instance), you need to manually edit it so that this cluster appears only once. You can also edit the taxonomy column to replace the species epithet by a dummy value.
 
-10. Make a copy of `all_16S_cd-hit_clusters_tax_full.tsv` with only columns 1 and 7, remove the header, and remove redundant lines: `awk ' BEGIN { FS = OFS = "\t" }; NR > 1 {print $1, $7}' all_16S_cd-hit_clusters_tax_full.tsv | sort -k1,1 | uniq > all_16S_cd-hit_clusters_tax_species.txt`. Now you should end up with a table reporting the species-level taxonomy of each cluster. You might have had several different strains in one cluster at **step 5**, but they should still all belong to the same species, therefore each cluster should appear only once in the table.
+8. Next we prepare some files to generate the addSpecies database:
+```
+awk ' BEGIN { FS = OFS = "\t" }; NR > 1 {print $1, $5}' "$prefix"_clusters_tax_full.tsv | sort -k1,1 | uniq > "$prefix"_clusters_gs.txt
+```
+Similarly, if a cluster appears twice but with different taxonomy, you need to manually edit the table so that this cluster appears only once. You can also edit the taxonomy column to replace the species epithet and strain name by dummy values.
 
-11. Make another copy with only columns 1 and 5, remove the header, and remove redundant lines: `awk ' BEGIN { FS = OFS = "\t" }; NR > 1 {print $1, $5}' all_16S_cd-hit_clusters_tax_full.tsv | sort -k1,1 | uniq > all_16S_cd-hit_clusters_gs.txt`. Now you should end up with a table reporting the exact species name of each cluster. If a cluster had several different strains/species in it, it will appear more than once in this file. Open the file and remove lines so that each cluster appears only once. Then give a custom name to these mixed clusters. The new name does not matter since you will not use ASVs assigned to those clusters anyways.
+9. Now we create custom databases with suitable headers for each dada2 function:
+```
+# genus-level
+seqkit replace -p '^(\S+)' -r '{kv}$2' -k "$prefix"_clusters_tax_genus.txt "$prefix"_renamed.fna > "$dbprefix"_toGenus.fa
+# species-level
+seqkit replace -p '^(\S+)' -r '{kv}$2' -k "$prefix"_clusters_tax_species.txt "$prefix"_renamed.fna > "$dbprefix"_toSpecies.fa
+# addSpecies
+seqkit replace -p '^(\S+)' -r '${1} {kv}' -k "$prefix"_clusters_gs.txt "$prefix"_renamed.fna > "$dbprefix"_addSpecies.fa
+```
 
-12. Create a copy of the database with suitable headers for `assignTaxonomy()` at genus level: `seqkit replace -p '^(\S+)' -r '{kv}$2' -k all_16S_cd-hit_clusters_tax_genus.txt all_16S_cd-hit_renamed.fna > syncom_custom_db_toGenus.fa`.
-
-13. Create a copy of the database with suitable headers for `assignTaxonomy()` at species level: `seqkit replace -p '^(\S+)' -r '{kv}$2' -k all_16S_cd-hit_clusters_tax_species.txt all_16S_cd-hit_renamed.fna > syncom_custom_db_toSpecies.fa`.
-
-14. Create a copy of the database with suitable headers for `addSpecies()`: `seqkit replace -p '^(\S+)' -r '${1} {kv}' -k all_16S_cd-hit_clusters_gs.txt all_16S_cd-hit_renamed.fna > syncom_custom_db_addSpecies.fa`.
-
-15. Open your databases in a text editor and check that the formatting corresponds to the requirements described [here](https://benjjneb.github.io/dada2/training.html#formatting-custom-databases).
+10. Open your databases in a text editor and check that the formatting corresponds to the requirements described [here](https://benjjneb.github.io/dada2/training.html#formatting-custom-databases).
 
 ### Comparing and merging databases
 
-16. Copy the published databases you want to merge your custom databases to into the current folder. You can download them [here](https://benjjneb.github.io/dada2/training.html#dada2-formatted-reference-databases). Make sure to download the *_toGenus_trainset*  and the *_toSpecies_trainset* files.
+11. Copy the published databases you want to merge your custom databases to into the current folder. You can download them [here](https://benjjneb.github.io/dada2/training.html#dada2-formatted-reference-databases). Make sure to download the *_toGenus_trainset*  and the *_toSpecies_trainset* files.
 
-17. Compare the two databases for `assignTaxonomy()`: we basically want to remove sequences in the published database that are identical to sequences in our custom database.
-    - Use `cd-hit-est-2d -i syncom_custom_db_toSpecies.fa -i2 gg2_2024_09_toSpecies_trainset.fa -o compare_gg2_custom_toSpecies -c 1 -n 10 -d 0` for the species-level database.
-    - Use `cd-hit-est-2d -i syncom_custom_db_toGenus.fa -i2 gg2_2024_09_toGenus_trainset.fa -o compare_gg2_custom_toGenus -c 1 -n 10 -d 0` for the genus-level database.
-    - The outputs are: **(1)** a fasta file with all sequences from GreenGenes2 that are **not identical** to sequences in your custom db, and **(2)** a `.clstr` text file listing similar sequences between the two databases.
-
-18. Merge the non-redundant databases:
+12. Compare the two databases for `assignTaxonomy()`: we basically want to remove sequences in the published database that are identical to sequences in our custom database.
 ```
 # species-level
-seqkit seq compare_gg2_custom_toSpecies > syncom_custom_db_toSpecies_trainset.fa
-cat syncom_custom_db_toSpecies.fa >> syncom_custom_db_toSpecies_trainset.fa
+cd-hit-est-2d -i "$dbprefix"_toSpecies.fa -i2 gg2_2024_09_toSpecies_trainset.fa -o compare_gg2_custom_toSpecies -c 1 -n 10 -d 0
 # genus-level
-seqkit seq compare_gg2_custom_toGenus > syncom_custom_db_toGenus_trainset.fa
-cat syncom_custom_db_toGenus.fa >> syncom_custom_db_toGenus_trainset.fa
+cd-hit-est-2d -i "$dbprefix"_toGenus.fa -i2 gg2_2024_09_toGenus_trainset.fa -o compare_gg2_custom_toGenus -c 1 -n 10 -d 0
+```
+The outputs are: **(1)** a fasta file with all sequences from GreenGenes2 that are **not identical** to sequences in your custom db, and **(2)** a `.clstr` text file listing similar sequences between the two databases.
+
+13. Merge the non-redundant databases:
+```
+# species-level
+seqkit seq compare_gg2_custom_toSpecies > "$dbprefix"_toSpecies_trainset.fa
+cat "$dbprefix"_toSpecies.fa >> "$dbprefix"_toSpecies_trainset.fa
+# genus-level
+seqkit seq compare_gg2_custom_toGenus > "$dbprefix"_toGenus_trainset.fa
+cat "$dbprefix"_toGenus.fa >> "$dbprefix"_toGenus_trainset.fa
 ```
 
-You are now ready to use the custom databases with dada2. You will also need `all_16S_cd-hit_clusters_tax_full.tsv` to run the strain quantification script. I personally like to use the `toSpecies_trainset` with `assignTaxonomy()`, but you can instead use the `toGenus_trainset` with this function to limit memory usage if you are not interested in the species-level classification of 'contaminants'.
+You are now ready to use the custom databases with dada2. You will also need the clusters table to run the strain quantification script. I personally like to use the `toSpecies_trainset` with `assignTaxonomy()`, but you can instead use the `toGenus_trainset` with this function to if you are not interested in the species-level classification of 'contaminants'.
 
 ---
 

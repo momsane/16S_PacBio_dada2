@@ -25,6 +25,11 @@ if(!require(ggplot2)){
   library(ggplot2)
 }
 
+if(!require(scales)){
+  install.packages(pkgs = 'scales', repos = 'https://stat.ethz.ch/CRAN/')
+  library(scales)
+}
+
 if(!require(rlang)){
   install.packages(pkgs = 'rlang', repos = 'https://stat.ethz.ch/CRAN/')
   library(rlang)
@@ -100,7 +105,7 @@ if (length(args) != 10){
 # out.tax <- file.path(root, "results", "assign_taxonomy")
 # out.plots <- file.path(root, "plots")
 
-rank_names <- c("Kingdom", "Phylum", "Class", "Family", "Order", "Genus", "Species", "Strain", "Cluster")
+rank_names <- c("Kingdom", "Phylum", "Class", "Family", "Order", "Genus", "Species", "Strain", "Cluster", "ASV")
 if (facet_var %in% rank_names){
   cat("Error: the provided facet_var is conflicting with taxonomic rank names! Please change the name of this variable before continuing.\n")
   quit(save="no")
@@ -138,6 +143,10 @@ taxonomy_object <- assignTaxonomy(
 
 ASV_taxonomy <- taxonomy_object$tax
 bootstraps <- taxonomy_object$boot
+
+# cleanup
+rm(taxonomy_object)
+invisible(gc())
 
 cat("\n")
 
@@ -467,6 +476,8 @@ df_ab <- abundance_table_long %>%
     avg_read_count = mean(read_count)
   )
 
+write.table(df_ab, file.path(out.tax, "ASV_stats.tsv"), sep = "\t", quote = F, col.names = T, row.names = F)
+
 # plot
 if (db2 != ""){
   # color ASVs exactly matching references
@@ -481,7 +492,7 @@ if (db2 != ""){
       color = Genus_label
     )) +
     geom_point(alpha = 0.5) +
-    scale_x_log10(breaks = 10^c(0:7)) +
+    scale_x_log10(breaks = 10^c(0:7), label = label_log()) +
     scale_y_continuous(limits = c(0,100), breaks = seq(0,100,20)) +
     labs(
       x = "Total abundance (reads)",
@@ -504,7 +515,7 @@ if (db2 != ""){
       y = prevalence
     )) +
     geom_point(alpha = 0.5) +
-    scale_x_log10(breaks = 10^c(0:7)) +
+    scale_x_log10(breaks = 10^c(0:7), label = label_log()) +
     scale_y_continuous(limits = c(0,100), breaks = seq(0,100,20)) +
     labs(
       x = "Total abundance (reads)",
