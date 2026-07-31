@@ -68,12 +68,14 @@ if (length(args) != 8){
 # root <- "/Volumes/RECHERCHE/FAC/FBM/DMF/pengel/general_data/D2c/mgarcia/20240708_mgarcia_syncom_assembly/pacbio_analysis/run1_MD_bees"
 # input.ps <- file.path(root, "results", "assign_taxonomy", "phyloseq_object_filtered_nonrarefied.RDS")
 # input.clusters <- file.path(root, "workflow", "config", "all_16S_cd-hit_clusters_tax_full.tsv")
-# input.qpcr <- "/Volumes/RECHERCHE/FAC/FBM/DMF/pengel/general_data/D2c/mgarcia/20240708_mgarcia_syncom_assembly/absolute_quantification_results/qPCR_results_analyzed.tsv"
-# abundance_col <- "normalized_16S_copies"
+# input.qpcr <- "/Volumes/RECHERCHE/FAC/FBM/DMF/pengel/general_data/D2c/mgarcia/20240708_mgarcia_syncom_assembly/absolute_quantification_results/03_qPCR_results_analyzed.tsv"
+# abundance_col <- "copies_16S_sample"
 # facet_var <- "SampleType"
 # maxraref <- -1
 # out.quant <- file.path(root, "results", "quantify_strains")
 # out.plots <- file.path(root, "plots")
+
+set.seed(42)
 
 if (facet_var %in% c("Kingdom", "Phylum", "Class", "Family", "Order", "Genus", "Species")){
   cat("Error: the provided facet_var is conflicting with taxonomic rank names! Please change the name of this variable before continuing.\n")
@@ -112,9 +114,11 @@ tax_unique <- unique(tax[ ,cols] %>% filter(!is.na(Strain))) %>% arrange(Strain)
 
 meta <- sample_data(ps)
 
+
+
 # Add qPCR data if available
 
-# function to convert to df to matrix
+## function to convert to df to matrix
 df_to_matrix <- function(df = data.frame(), rownames_col = character(), names_col = character(), values_col = character()){ 
   # pivot wider
   df2 <- df[,c(rownames_col, names_col, values_col)] %>% 
@@ -129,6 +133,8 @@ df_to_matrix <- function(df = data.frame(), rownames_col = character(), names_co
   rownames(mat2) <- rownames(mat)
   return(mat2)
 }
+
+## add qPCR data
 
 if ((input.qpcr != "") & (abundance_col != "")){
   cat("Adding qPCR data\n")
@@ -156,7 +162,7 @@ if ((input.qpcr != "") & (abundance_col != "")){
   
   if (length(samples_noqpcr) != 0){
     cat("The samples below do not have any qPCR data. Strain counts will be computed separately and based on read counts.\n")
-    cat(paste0(samples_noqpcr))
+    cat(paste0(samples_noqpcr, collapse = ", "))
     cat("\n")
     
     # re-shape data as matrix like tab
@@ -204,41 +210,48 @@ if ((input.qpcr != "") & (abundance_col != "")){
   saveRDS(ps_abs, file.path(out.quant, "phyloseq_object_filtered_absabun.RDS"))
   
 } else {
+  
   tab2 <- tab
+
 }
+
+
+
 
 # Quantification of known strains
 
 cat("Inferring strain abundance\n")
-cat("Note: only ASVs matching the provided custom database will be used to infer strain abundance.\n")
+cat("Note: only ASVs matching the provided custom database will be used to infer strain abundance and proportion of detected ASVs.\n")
 
 # A: ASV by sample matrix (r,c) = abundance of each ASV in each sample
 # B: ASV by strain matrix (r,c) = number of copies of each ASV in each strain
 # C: strain by sample matrix (r,c) = abundance of each strain in each sample <- this is what we want!
 # We know A and B, and that A=B.C
 
-# make matrix B
 
-## remove ASV clusters that the user does not want to use for quantification
+## make matrix B
+
+### remove ASV clusters that the user does not want to use for quantification
 cls_use <- clusters$cluster[!is.na(clusters$n_copies)]
-## keep only ASVs matching a syncom ASV and with known copy number
+### keep only ASVs matching a syncom ASV and with known copy number
 asv_cls <- sort(unique(tax$ASV[tax$inferred_from == "addSpecies_custom" & tax$Cluster %in% cls_use]))
 
-## get number of ASV copy per strain
+### get number of ASV copy per strain
 clusters2 <- clusters %>% 
   filter(cluster %in% cls_use) %>%
   select(all_of(c("cluster", "strain", "n_copies"))) %>%
   pivot_wider(names_from = strain, values_from = n_copies)
-## convert to matrix = B
+### convert to matrix = B
 clusters3 <- as.matrix(clusters2)
 rownames(clusters3) <- clusters3[ ,1]
 clusters3 <- clusters3[ ,-1]
 clusters3[is.na(clusters3)] <- 0
-## convert to numeric
+### convert to numeric
 clusters4 <- apply(clusters3,2,as.numeric)
 rownames(clusters4) <- rownames(clusters3)
 
-# make matrix A
+
+## make matrix A
 
 make_matA <- function(matrix){
   matA <- t(matrix[ ,asv_cls])
@@ -253,7 +266,8 @@ if (length(samples_noqpcr) != 0){
   tab5 <- make_matA(tab3)
 }
 
-# solve the strain by sample matrix = C
+
+## function to solve the strain by sample matrix = C
 
 solve_matC <- function(matA, matB, name){
   ## make sure ASVs are exactly the same and in order in both matrices
@@ -284,12 +298,35 @@ solve_matC <- function(matA, matB, name){
   return(list(matC, df))
 }
 
-# solve and reformat table
+## function to check for partial detection of ASVs for each strain
+
+calc_detect_asvs <- function(tab_clusters, tab_otu){
+ 
+  # pivot to long table
+  d1 <- as.data.frame(tab_clusters) %>%
+    mutate(cluster = rownames(tab_clusters), .before = 1) %>% 
+    pivot_longer(colnames(tab_clusters), names_to = "SampleID", values_to = "read_count") %>%
+    left_join(clusters[ ,c("cluster", "strain", "n_copies")], by = "cluster") %>%
+    rename(Strain = strain) %>%
+    group_by(SampleID, Strain) %>%
+    summarize(n_detected_ASVs = sum(read_count > 0), n_ASVs = n_distinct(cluster), total_copies = sum(n_copies)) %>%
+    mutate(prop_detected_ASVs = n_detected_ASVs/n_ASVs)
+  
+  # add total read count to compute LOD later
+  readcounts <- apply(tab_otu,1,sum)
+  d2 <- data.frame(SampleID = names(readcounts), total_reads = readcounts)
+  d1 <- d1 %>% 
+    left_join(d2, by = "SampleID")
+  
+  return(d1)
+}
+
+
+## run solve and ASV detection
 
 if ((input.qpcr != "") & (abundance_col != "")){
   
   # solve for samples with absolute abundance
-  
   solved_qpcr <- solve_matC(matA = tab4, matB = clusters4, "qpcr")
   
   C <- solved_qpcr[[1]]
@@ -303,14 +340,28 @@ if ((input.qpcr != "") & (abundance_col != "")){
       rel_abun = if_else(!is.na(rel_abun),rel_abun,0),
       .after="abs_abun"
     ) %>% 
-    left_join(tax_unique, by = "Strain") %>%
-    left_join(meta, by = "SampleID") %>%
-    arrange(Species)
+    left_join(tax_unique, by = "Strain")
   
+  # add ASV detection
+  detect_qpcr <- calc_detect_asvs(tab4, tab)
+  df <- df %>% 
+    left_join(detect_qpcr, by = join_by("SampleID", "Strain"))
+  
+  # add total abundance from qpcr data and compute absolute LOD
+  # -> minimal number of genome equivalents we can detect if the strain gets 1 single read in total
+  cat("Note: for samples with available qPCR data, the minimum genome-equivalent estimate (MGEE) corresponds to the genome-equivalent abundance if the strain gets a single read across all ASVs. It is strain- and sample-specific.\n")
+  df <- df %>% 
+    left_join(qpcr[ ,c("SampleID", abundance_col)], by = "SampleID") %>% 
+    mutate(MGEE = !!sym(abundance_col)/(total_copies*total_reads))
+  
+  # add sample metadata
+  df <- df %>% 
+    left_join(meta, by = "SampleID")
+  
+  # save
   write.table(df, file.path(out.quant, "strain_quant_long_table_qpcr.tsv"), sep = "\t", quote = F, col.names = T, row.names = F)
   
   # solve for samples without absolute abundance
-  
   if (length(samples_noqpcr) != 0){
     solved_noqpcr <- solve_matC(matA = tab5, matB = clusters4, "samples_noqpcr")
     C_noqpcr <- solved_noqpcr[[1]]
@@ -324,10 +375,18 @@ if ((input.qpcr != "") & (abundance_col != "")){
         rel_abun = if_else(!is.na(rel_abun),rel_abun,0),
         .after="count"
       ) %>% 
-      left_join(tax_unique, by = "Strain") %>%
-      left_join(meta, by = "SampleID") %>%
-      arrange(Species)
+      left_join(tax_unique, by = "Strain")
     
+    # add ASV detection
+    detect_noqpcr <- calc_detect_asvs(tab5, tab)
+    df_noqpcr <- df_noqpcr %>% 
+      left_join(detect_noqpcr, by = join_by("SampleID", "Strain"))
+    
+    # add sample metadata
+    df_noqpcr <- df_noqpcr %>% 
+      left_join(meta, by = "SampleID")
+    
+    # save
     write.table(df_noqpcr, file.path(out.quant, "strain_quant_long_table_samples_noqpcr.tsv"), sep = "\t", quote = F, col.names = T, row.names = F)
   }
   
@@ -342,18 +401,31 @@ if ((input.qpcr != "") & (abundance_col != "")){
     pivot_longer(colnames(C), names_to = "SampleID", values_to = "count") %>% 
     group_by(SampleID) %>% 
     mutate(rel_abun = 100*count/sum(count)) %>% 
-    left_join(tax_unique, by = "Strain") %>%
-    left_join(meta, by = "SampleID") %>%
-    arrange(Species)
+    left_join(tax_unique, by = "Strain")
   
+  # add ASV detection
+  detect <- calc_detect_asvs(tab4, tab)
+  df <- df %>% 
+    left_join(detect, by = join_by("SampleID", "Strain"))
+  
+  # add sample metadata
+  df <- df %>% 
+    left_join(meta, by = "SampleID")
+  
+  # save
   write.table(df, file.path(out.quant, "strain_quant_long_table_noqpcr.tsv"), sep = "\t", quote = F, col.names = T, row.names = F)
 }
 
+
+
+
+# Generate plots
 
 cat("Generating plots\n")
 
 # custom label with species and strain name
 df <- df %>% 
+  arrange(Species) %>%
   mutate(label = paste(substr(Genus, 1, 1),". ", word(Species, 2), " ", Strain, sep = ""))
 
 # order strains by their species
@@ -364,7 +436,7 @@ df$label <- factor(df$label, levels = unique(df$label), ordered = T)
 generate_palette <- function(df) {
   
   # get genera
-  genera <- unique(df[["Genus"]])
+  genera <- sort(unique(df[["Genus"]]))
   
   # assign color to genera
   n_colors <- length(genera)
@@ -402,7 +474,8 @@ generate_palette <- function(df) {
 }
 
 pal <- generate_palette(unique(df[ ,c("Genus", "label")])) %>% 
-  left_join(unique(df[ ,c("Strain", "label")]), by = "label")
+  left_join(unique(df[ ,c("Strain", "label")]), by = "label") %>% 
+  arrange(label)
 
 # save palette
 write.table(
@@ -463,6 +536,10 @@ if (length(samples_noqpcr) != 0){
 } else {
   df_rel <- df 
 }
+
+# order strains by their species
+df_rel$Strain <- factor(df_rel$Strain, levels = levels(df$Strain), ordered = T)
+df_rel$label <- factor(df_rel$label, levels = levels(df$label), ordered = T)
 
 p_rel <- ggplot(
   df_rel %>% filter(rel_abun!=0),
