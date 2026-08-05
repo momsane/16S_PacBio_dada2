@@ -27,10 +27,10 @@ ps="$root"/results/assign_taxonomy/phyloseq_object_filtered_nonrarefied.RDS
 # ps="$root"/results/assign_taxonomy/phyloseq_object_filtered_rarefied.RDS
 
 clusters="$root"/workflow/config/all_16S_cd-hit_clusters_tax_full.tsv
-qpcr="$root"/data/qPCR_results_analyzed.tsv # tab-delimited table containing qpcr data, or "" if none
-abundance_col=normalized_16S_copies_gut # column in which the total abundance is reported, or "" if none
+qpcr="$root"/data/03_qPCR_results_analyzed.tsv # tab-delimited table containing qpcr data, or "" if none
+abundance_col=copies_16S_sample # column in which the total abundance is reported, or "" if none
 facet_var=SampleType
-maxraref=-1 # set to ~4 times less the value you used in the denoising step, or -1 to skip rarefaction curves
+maxraref=-1 # set -1 to skip rarefaction curves
 
 # do not modify below this line
 script="$root"/workflow/scripts/06_quantify_strains.R
@@ -41,7 +41,7 @@ out_plots="$root"/plots
 # Execute the R script
 
 echo "Parameters:"
-echo input.ps: "$asvs"
+echo input.ps: "$ps"
 echo input.clusters: "$clusters"
 echo input.qpcr: "$qpcr"
 echo abundance_col: "$abundance_col"

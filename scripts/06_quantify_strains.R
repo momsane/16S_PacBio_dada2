@@ -20,6 +20,11 @@ if(!require(ggplot2)){
   library(ggplot2)
 }
 
+if(!require(scales)){
+  install.packages(pkgs = 'scales', repos = 'https://stat.ethz.ch/CRAN/')
+  library(scales)
+}
+
 if(!require(rlang)){
   install.packages(pkgs = 'rlang', repos = 'https://stat.ethz.ch/CRAN/')
   library(rlang)
@@ -212,7 +217,7 @@ if ((input.qpcr != "") & (abundance_col != "")){
 } else {
   
   tab2 <- tab
-
+  
 }
 
 
@@ -262,8 +267,10 @@ make_matA <- function(matrix){
 
 tab4 <- make_matA(tab2)
 
-if (length(samples_noqpcr) != 0){
-  tab5 <- make_matA(tab3)
+if ((input.qpcr != "") & (abundance_col != "")){
+  if (length(samples_noqpcr) != 0){
+    tab5 <- make_matA(tab3)
+  }
 }
 
 
@@ -301,20 +308,29 @@ solve_matC <- function(matA, matB, name){
 ## function to check for partial detection of ASVs for each strain
 
 calc_detect_asvs <- function(tab_clusters, tab_otu){
- 
+  
   # pivot to long table
   d1 <- as.data.frame(tab_clusters) %>%
     mutate(cluster = rownames(tab_clusters), .before = 1) %>% 
     pivot_longer(colnames(tab_clusters), names_to = "SampleID", values_to = "read_count") %>%
     left_join(clusters[ ,c("cluster", "strain", "n_copies")], by = "cluster") %>%
     rename(Strain = strain) %>%
+    mutate(ASV_partial_detect = if_else((read_count < n_copies) & (read_count > 0),TRUE,FALSE)) %>%
     group_by(SampleID, Strain) %>%
-    summarize(n_detected_ASVs = sum(read_count > 0), n_ASVs = n_distinct(cluster), total_copies = sum(n_copies)) %>%
-    mutate(prop_detected_ASVs = n_detected_ASVs/n_ASVs)
+    summarize(
+      n_detected_ASVs = sum(read_count > 0),
+      n_partial_ASVs = sum(ASV_partial_detect == TRUE),
+      n_ASVs = n_distinct(cluster),
+      total_copies = sum(n_copies)
+    ) %>%
+    mutate(
+      prop_detected_ASVs = n_detected_ASVs/n_ASVs,
+      prop_partial_ASVs = n_partial_ASVs/n_ASVs
+    )
   
-  # add total read count to compute LOD later
+  # add total read count to compute MGEE later
   readcounts <- apply(tab_otu,1,sum)
-  d2 <- data.frame(SampleID = names(readcounts), total_reads = readcounts)
+  d2 <- data.frame(SampleID = names(readcounts), total_sample_reads = readcounts)
   d1 <- d1 %>% 
     left_join(d2, by = "SampleID")
   
@@ -352,7 +368,7 @@ if ((input.qpcr != "") & (abundance_col != "")){
   cat("Note: for samples with available qPCR data, the minimum genome-equivalent estimate (MGEE) corresponds to the genome-equivalent abundance if the strain gets a single read across all ASVs. It is strain- and sample-specific.\n")
   df <- df %>% 
     left_join(qpcr[ ,c("SampleID", abundance_col)], by = "SampleID") %>% 
-    mutate(MGEE = !!sym(abundance_col)/(total_copies*total_reads))
+    mutate(MGEE = !!sym(abundance_col)/(total_copies*total_sample_reads))
   
   # add sample metadata
   df <- df %>% 
@@ -529,10 +545,14 @@ if ((input.qpcr != "") & (abundance_col != "")){
 }
 
 # relative abundance
-if (length(samples_noqpcr) != 0){
-  df_noqpcr <- df_noqpcr %>% 
-    mutate(label = paste(substr(Genus, 1, 1),". ", word(Species, 2), " ", Strain, sep = ""))
-  df_rel <- rbind(df, df_noqpcr)
+if ((input.qpcr != "") & (abundance_col != "")){
+  if (length(samples_noqpcr) != 0){
+    df_noqpcr <- df_noqpcr %>% 
+      mutate(label = paste(substr(Genus, 1, 1),". ", word(Species, 2), " ", Strain, sep = ""))
+    df_rel <- rbind(df, df_noqpcr)
+  } else {
+    df_rel <- df
+  }
 } else {
   df_rel <- df 
 }
@@ -598,10 +618,10 @@ if (maxraref <= 0){
     q = c(0,1),
     datatype = "abundance",
     endpoint = maxraref,
-    knots = 50,
+    knots = 40,
     se = TRUE,
     conf = 0.95,
-    nboot = 20
+    nboot = 10
   )
   
   inextqd <- dt$iNextEst$size_based %>%
@@ -634,6 +654,8 @@ if (maxraref <= 0){
       ), size = 3, nudge_x = 70
     ) +
     scale_y_continuous(breaks = seq(0,max(inextqd$qD[inextqd$Method != "Extrapolation"])+5,5)) +
+    scale_x_log10(label = label_log()) +
+    annotation_logticks(sides = "b") +
     theme_bw() +
     labs(
       x = "# of cells",

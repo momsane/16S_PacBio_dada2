@@ -26,16 +26,16 @@ Table of contents
 If you have a defined community, you can go beyond 16S copy number abundance and estimate the abundance of microbial cells in your sample. For this, you need to know which ASVs are present in the genome of each strain, and in how many copies. This information can be extracted from complete genomes and amplicon sequencing of your isolates. See [Custom database for defined communities](#creating-a-custom-database-for-defined-communities).
 
 This is performed by the last step of this pipeline *06_quantify_strains*:
-- first, integrate qPCR data of 16S rRNA absolute abundance if the user provides it
-- second, if qPCR data is provided, compute ASV relative abundance then ASV absolute abundance
-- third, estimate genome-equivalents from ASV abundance using QR decomposition, which to simplify is a linear least square solver for matrices.
+1. integrate qPCR data of 16S rRNA absolute abundance if the user provides it;
+2. if qPCR data is provided, compute ASV relative abundance then ASV absolute abundance;
+3. estimate genome-equivalents from ASV abundance using QR decomposition, which to simplify is a linear least square solver for matrices.
 
 **Genome-equivalents (GE)** correspond to an estimate of cell counts in your samples. If you did not provide qPCR data, this estimate will remain **compositional**, just like the number of reads. It can then be combined with absolute biomass data like OD<sub>600</sub> to get absolute abundances. If you provide qPCR data, then the output value is **absolute**.
 
 In addition, when the absolute GE value is estimated, the **minimum genome-equivalent estimate (MGEE)** is also computed. This corresponds to the minimal GE value you can obtain if a focal strain got exactly one read across all its copies in a given sample. It depends on the number of 16S rRNA copies in the genome (*k*), the total biomass in the sample (*B*) and the sequencing depth (*R*): $k\frac{B}{R}$.
 
-While this gives some "detection limit" estimate, it will only reflect a GE abundance with partial detection if the strain has >1 16S rRNA copies in its genome.
-This is why the proportion of detected ASVs (*prop_detected_ASVs*) is also provided to separate fully from partially detected strains.
+While this gives some estimate of the "detection limit", it will only reflect a partial GE abundance if the strain has >1 16S rRNA copies in its genome.
+This is why the proportion of detected ASVs (*prop_detected_ASVs*) and the proportion of ASVs detected in fewer than its number of copies (*prop_partial_ASVs*) are also provided to separate fully from partially detected strains.
 
 
 ## Running the dada2 pipeline
@@ -140,6 +140,8 @@ To run the other scripts:
 **Note 1:** the first time you run `02_slurm_preprocessing.sh` and `05_slurm_assign_taxonomy.sh`, some R packages will be installed. The execution might be halted with an error message after the last installation. This is because the R environment needs to be reloaded. Simply run the script again and it should work.
 
 **Note 2:** to use `06_slurm_quantify_strains.sh`, you first need to create your custom database (see below) and run `05_slurm_assign_taxonomy.sh` with this custom database as `db2`.
+
+**Note 3:** while `06_slurm_quantify_strains.sh` with qPCR data, you might need to run it twice on separate subsets of samples if the 16S total abundance variable is different between samples (i.e., you have bees with 16S abundance normalized by actin abundance, and other samples with non-normalized 16S abundance). To do so, split your qPCR data table, and rename the output folder.
 
 ---
 

@@ -432,10 +432,14 @@ if (rarefy_to <= 0){
   
   # list samples that are removed
   samples_diff <- setdiff(
-    colnames(otu_table(ps)),
-    colnames(otu_table(ps.raref))
+    rownames(otu_table(ps)),
+    rownames(otu_table(ps.raref))
   )
-  cat(paste0("Rarefaction removed the following samples: ", paste0(samples_diff, collapse = ", "), "\n"))
+  cat(paste0("Rarefaction removed ", length(samples_diff) , " sample(s)\n"))
+  
+  ## save them in separate ps object
+  ps.discard <- subset_samples(ps, SampleID %in% samples_diff)
+  saveRDS(object = ps.discard, file = file.path(out.tax, "phyloseq_object_filtered_discarded_samples.RDS"))
   
   # find ASVs with total abundance of 0
   ab <- apply(otu_table(ps.raref), 1, sum)

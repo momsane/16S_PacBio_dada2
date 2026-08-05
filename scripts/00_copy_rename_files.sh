@@ -20,6 +20,8 @@ mkdir -p "$path_to_cluster"
 
 dos2unix "$name_table"
 
+echo "Copying files"
+
 # copy and rename files
 while read -r oldname newname; do
     cp "$path_to_nas"/"$oldname" "$path_to_cluster"/"$newname"

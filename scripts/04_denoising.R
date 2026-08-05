@@ -329,7 +329,7 @@ reads.plot2 <- ggplot(
   )
 ) +
   geom_histogram(bins = 20, boundary = 0, closed = "left") +
-  scale_x_log10(label = label_log()) +
+  scale_x_log10(label = label_log(), breaks=10^c(0:6)) +
   annotation_logticks(
     sides="b",
     outside=T,
@@ -402,7 +402,8 @@ if (length(unique(inextqd$SampleID)) >= 70){
   ) +
     geom_vline(aes(xintercept = min(totab), color = "low"), linetype = "dashed") + # sample with lowest number of reads
     geom_vline(aes(xintercept = max(totab), color = "high"), linetype = "dashed") + # sample with highest number of reads
-    scale_x_log10(label = label_log()) +
+    scale_x_log10(label = label_log(), breaks=10^c(0:6)) +
+    annotation_logticks(sides = "b") +
     scale_color_manual(name = "", values = c(low = "#669bbc", high = "#e76f51"), labels = c(low = "Lowest depth", high = "Highest depth")) +
     geom_line(alpha = 0.4) +
     geom_ribbon(
@@ -433,7 +434,8 @@ if (length(unique(inextqd$SampleID)) >= 70){
   ) +
     geom_vline(aes(xintercept = min(totab), color = "low"), linetype = "dashed") + # sample with lowest number of reads
     geom_vline(aes(xintercept = max(totab), color = "high"), linetype = "dashed") + # sample with highest number of reads
-    scale_x_log10(label = label_log()) +
+    scale_x_log10(label = label_log(), breaks=10^c(0:6)) +
+    annotation_logticks(sides = "b") +
     scale_color_manual(name = "", values = c(low = "#669bbc", high = "#e76f51"), labels = c(low = "Lowest depth", high = "Highest depth")) +
     geom_line(alpha = 0.4) +
     geom_ribbon(
