@@ -15,6 +15,11 @@ if(!require(stringr)){
   library(stringr)
 }
 
+if(!require(readr)){
+  install.packages(pkgs = 'stringr', repos = 'https://stat.ethz.ch/CRAN/')
+  library(readr)
+}
+
 if(!require(ggplot2)){
   install.packages(pkgs = 'ggplot2', repos = 'https://stat.ethz.ch/CRAN/')
   library(ggplot2)
@@ -46,6 +51,16 @@ if(!require(RColorBrewer)){
 if(!require(grDevices)){
   install.packages(pkgs = 'grDevices', repos = 'https://stat.ethz.ch/CRAN/')
   library(grDevices)
+}
+
+if(!require(foreach)){
+  install.packages(pkgs = 'foreach', repos = 'https://stat.ethz.ch/CRAN/')
+  library(foreach)
+}
+
+if(!require(doParallel)){
+  install.packages(pkgs = 'doParallel', repos = 'https://stat.ethz.ch/CRAN/')
+  library(doParallel)
 }
 
 if(!require(iNEXT)){
@@ -321,7 +336,8 @@ calc_detect_asvs <- function(tab_clusters, tab_otu){
       n_detected_ASVs = sum(read_count > 0),
       n_partial_ASVs = sum(ASV_partial_detect == TRUE),
       n_ASVs = n_distinct(cluster),
-      total_copies = sum(n_copies)
+      total_copies = sum(n_copies),
+      sum_reads = sum(read_count)
     ) %>%
     mutate(
       prop_detected_ASVs = n_detected_ASVs/n_ASVs,
@@ -602,82 +618,213 @@ ggsave(file.path(out.plots, "06_strain_barplot_relative.pdf"), p_rel, device="pd
 
 ### Rarefaction curves ###
 
+## The range of values is split into numCores chunks to run in parallel
+
+run_inext <- function(knots = 40, maxraref = numeric(), input, n = numCores){
+  
+  # define output file and log paths
+  inext_file <- file.path(out.quant, "inext_data.tsv")
+  log_file = file.path(out.quant, "inext.log")
+  
+  # clear output and log files
+  if (file.exists(inext_file)) {
+    cat("Deleting previous results file\n")
+    file.remove(inext_file)
+  }
+  if (file.exists(log_file)) {
+    cat("Deleting previous log file\n")
+    file.remove(log_file)
+  }
+  
+  cat("Preparing inputs\n")
+  # filter out samples with total abundance of 0 in the input
+  depth <- apply(input, 2, sum)
+  samples_keep <- names(which(depth != 0))
+  input2 <- input[,samples_keep]
+  
+  # create list of sizes for x knots between 1 and maxraref
+  sizes <- round(c(1,c(2:knots)*maxraref/knots))
+  
+  # cut list into chunks for parallel processing
+  if (n == 1){
+    intervals = rep(1,knots)
+  } else {
+    if (knots %% n != 0){
+      intervals <- c(cut(c(1:(knots - (knots %% n))), breaks=(n-1), label = FALSE), rep(n, knots %% n))
+    } else {
+      intervals <- cut(c(1:knots), breaks=n, label = FALSE)
+    }
+  }
+  
+  # run inext in parallel workers based on numCores
+  
+  cat("Running iNEXT in parallel\n")
+  
+  inext <- foreach(i = c(1:n), .packages = c("iNEXT", "dplyr")) %dopar% {
+    # define sizes for which to compute diversity
+    sizes_sub <- sizes[which(intervals == i)]
+    
+    # logging
+    con <- file(log_file, open = "a")
+    writeLines(paste0("Processing chunk ", i, "/", n, ": [", paste0(sizes_sub, collapse = ", "), "]"), con)
+    close(con)
+    
+    # run iNEXT
+    dt <- iNEXT(
+      input2, # samples must be as columns
+      q = c(0,1),
+      datatype = "abundance",
+      size = sizes_sub,
+      se = TRUE,
+      conf = 0.95,
+      nboot = 10
+    )
+    
+    # extract relevant data
+    inextqd <- dt$iNextEst$size_based %>%
+      dplyr::rename(SampleID = Assemblage)
+    
+    # save results to file
+    write.table(inextqd, 
+                file = inext_file,
+                sep = "\t", 
+                append = TRUE, 
+                col.names = !file.exists(inext_file),
+                row.names = FALSE,
+                quote = FALSE
+    )
+    
+    # logging
+    con <- file(log_file, open = "a")
+    writeLines(paste0("Finished chunk ", i, "/", n), con)
+    close(con)
+    
+    # return NULL so the master process stores nothing
+    NULL
+    
+  }
+  
+  cat("Reading and plotting results\n")
+  
+  # Read data
+  inextqd <- read_tsv(inext_file, show_col_types = F)
+  
+  # remove duplicated rows
+  inextqd <- inextqd %>% 
+    group_by(SampleID, m, Order.q) %>% 
+    filter(SC.LCL == min(SC.LCL)) %>%
+    arrange(SampleID, Order.q, m)
+  
+  # Overwrite file
+  write.table(inextqd, 
+              file = inext_file,
+              sep = "\t", 
+              col.names = TRUE,
+              row.names = FALSE,
+              quote = FALSE
+  )
+  
+  # create plot
+  if (length(unique(inextqd$SampleID)) >= 70){
+    qd.plot <- ggplot(
+      inextqd %>% filter(Method != "Extrapolation"),
+      aes(
+        x = m,
+        y = qD,
+        group = SampleID
+      )
+    ) +
+      geom_vline(aes(xintercept = min(inextqd$m[inextqd$Method == "Observed"]), color = "low"), linetype = "dashed") + # sample with lowest number of reads
+      geom_vline(aes(xintercept = max(inextqd$m[inextqd$Method == "Observed"]), color = "high"), linetype = "dashed") + # sample with highest number of reads
+      geom_line(alpha = 0.4) +
+      geom_ribbon(
+        aes(
+          ymin = qD.LCL,
+          ymax = qD.UCL
+        ), alpha = 0.1
+      ) +
+      scale_color_manual(name = "", values = c(low = "#669bbc", high = "#e76f51"), labels = c(low = "Lowest depth", high = "Highest depth")) +
+      scale_y_continuous(breaks = seq(0,max(inextqd$qD[inextqd$Method != "Extrapolation"])+5,5)) +
+      scale_x_log10(label = label_log(), breaks=1e3*seq(0,100,5)) +
+      annotation_logticks(sides = "b") +
+      theme_bw() +
+      labs(
+        x = "Genome equivalents",
+        y = "# of strains"
+      ) +
+      theme(
+        legend.position = "inside",
+        legend.position.inside = c(0.1,0.9),
+        legend.background = element_rect(fill=alpha('white', 0.4))
+      ) +
+      facet_wrap( ~ Order.q, scales = "free_y")
+  
+  } else {
+    
+    qd.plot <- ggplot(
+      inextqd %>% filter(Method != "Extrapolation"),
+      aes(
+        x = m,
+        y = qD,
+        group = SampleID
+      )
+    ) +
+      geom_vline(aes(xintercept = min(inextqd$m[inextqd$Method == "Observed"]), color = "low"), linetype = "dashed") + # sample with lowest number of reads
+      geom_vline(aes(xintercept = max(inextqd$m[inextqd$Method == "Observed"]), color = "high"), linetype = "dashed") + # sample with highest number of reads
+      geom_line(alpha = 0.4) +
+      geom_ribbon(
+        aes(
+          ymin = qD.LCL,
+          ymax = qD.UCL
+        ), alpha = 0.1
+      ) +
+      geom_label(
+        data = inextqd[inextqd$Method == "Observed", ],
+        aes(
+          x = m,
+          y = qD,
+          label = SampleID
+        ), size = 3, nudge_x = log10(maxraref*1e-3)
+      ) +
+      scale_color_manual(name = "", values = c(low = "#669bbc", high = "#e76f51"), labels = c(low = "Lowest depth", high = "Highest depth")) +
+      scale_y_continuous(breaks = seq(0,max(inextqd$qD[inextqd$Method != "Extrapolation"])+5,5)) +
+      scale_x_log10(label = label_log(), breaks=1e3*seq(0,100,5)) +
+      annotation_logticks(sides = "b") +
+      theme_bw() +
+      labs(
+        x = "Genome equivalents",
+        y = "# of strains"
+      ) +
+      theme(
+        legend.position = "inside",
+        legend.position.inside = c(0.1,0.9),
+        legend.background = element_rect(fill=alpha('white', 0.4))
+      ) +
+      facet_wrap( ~ Order.q, scales = "free_y")
+  }
+  
+  # save plot
+  ggsave(file.path(out.plots, paste0("06_rarefaction_curves_strains.pdf")), qd.plot, device="pdf", width = 12, height = 8)
+  
+}
+
 if (maxraref <= 0){
   cat("Skipping rarefaction curves\n")
 } else {
   cat("Generating rarefaction curves\n")
   
-  # filter out samples with total abundance of 0
-  strain_ab <- apply(C, 2, sum)
-  samples_keep <- names(which(strain_ab != 0))
-  C2 <- C[,samples_keep]
+  ### Set up parallel backend ###
   
-  # using iNEXT so I can also estimate the sampling coverage
-  dt <- iNEXT(
-    C2, # samples must be as columns
-    q = c(0,1),
-    datatype = "abundance",
-    endpoint = maxraref,
-    knots = 40,
-    se = TRUE,
-    conf = 0.95,
-    nboot = 10
-  )
+  #numCores <- max(1, detectCores() - 2)
+  numCores <- as.integer(Sys.getenv("SLURM_CPUS_PER_TASK", 1))
+  cat(paste0("Number of detected cores: ", numCores, "\n"))
+  cl <- makeCluster(numCores)
+  registerDoParallel(cl)
   
-  inextqd <- dt$iNextEst$size_based %>%
-    dplyr::rename(SampleID = Assemblage)
+  run_inext(knots = 40, maxraref = maxraref, input = C)
   
-  qd.plot <- ggplot(
-    inextqd[inextqd$Method != "Extrapolation", ],
-    aes(
-      x = m,
-      y = qD,
-      group = SampleID
-    )
-  ) +
-    geom_vline(aes(xintercept = min(inextqd$m[inextqd$Method == "Observed"]), color = "low"), linetype = "dashed") + # sample with lowest number of reads
-    geom_vline(aes(xintercept = max(inextqd$m[inextqd$Method == "Observed"]), color = "high"), linetype = "dashed") + # sample with highest number of reads
-    scale_color_manual(name = "", values = c(low = "#669bbc", high = "#e76f51"), labels = c(low = "Lowest depth", high = "Highest depth")) +
-    geom_line(alpha = 0.4) +
-    geom_ribbon(
-      aes(
-        ymin = qD.LCL,
-        ymax = qD.UCL
-      ), alpha = 0.1
-    ) +
-    geom_label(
-      data = inextqd[inextqd$Method == "Observed", ],
-      aes(
-        x = m,
-        y = qD,
-        label = SampleID
-      ), size = 3, nudge_x = 70
-    ) +
-    scale_y_continuous(breaks = seq(0,max(inextqd$qD[inextqd$Method != "Extrapolation"])+5,5)) +
-    scale_x_log10(label = label_log()) +
-    annotation_logticks(sides = "b") +
-    theme_bw() +
-    labs(
-      x = "# of cells",
-      y = "# of strains"
-    ) +
-    theme(
-      legend.position = "inside",
-      legend.position.inside = c(0.1,0.9),
-      legend.background = element_rect(fill=alpha('white', 0.4))
-    ) +
-    facet_wrap( ~ Order.q, scales = "free_y")
-  
-  ggsave(file.path(out.plots, "06_rarefaction_curves_strains.pdf"), qd.plot, device="pdf", width = 12, height = 8)
-  
-  write.table(
-    inextqd,
-    file = file.path(out.quant, "inext_data.tsv"),
-    sep = "\t",
-    quote = F,
-    row.names = F,
-    col.names = T
-  )
+  ### Stop cluster ###
+  stopCluster(cl)
 }
 
 cat("Strain quantification done\n")
