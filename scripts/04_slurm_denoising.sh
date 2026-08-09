@@ -24,7 +24,7 @@ root=/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees
 errModel=binnedQualErrfun # use 'binnedQualErrfun' if you have binned quality score, or else 'PacBioErrfun'
 db2="$root"/data/databases/syncom_custom_db_addSpecies.fa # give dada a set of expected ASVs, or set to ""
 pool=F # "T" or "pseudo" or "F", whether to pool samples for ASV inference
-maxraref=40000 # use the multiqc output to set this value close to the highest number of reads in your samples
+maxraref=40000 # use the multiqc output to set this value close to the highest number of reads in your samples, or set -1 to skip (not recommended)
 
 # do not modify below this line, unless you know what you are doing
 maxReads=1000000 # reduce if memory issues arise

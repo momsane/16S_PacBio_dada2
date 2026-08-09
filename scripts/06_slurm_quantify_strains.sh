@@ -3,10 +3,10 @@
 #SBATCH --account pengel_general_data
 #SBATCH --nodes 1
 #SBATCH --ntasks 1
-#SBATCH --cpus-per-task 1
-#SBATCH --mem 4000
+#SBATCH --cpus-per-task 6
+#SBATCH --mem 24000
 #SBATCH --partition cpu
-#SBATCH --time 00:30:00
+#SBATCH --time 02:00:00
 #SBATCH --error /work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees/logs/06_quantify_strains.log
 #SBATCH --output /work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees/logs/06_quantify_strains.log
 
@@ -30,7 +30,7 @@ clusters="$root"/workflow/config/all_16S_cd-hit_clusters_tax_full.tsv
 qpcr="$root"/data/03_qPCR_results_analyzed.tsv # tab-delimited table containing qpcr data, or "" if none
 abundance_col=copies_16S_sample # column in which the total abundance is reported, or "" if none
 facet_var=SampleType
-maxraref=-1 # set -1 to skip rarefaction curves
+maxraref=16000 # set -1 to skip rarefaction curves; if positive, recommended to use several cpus-per-task to speed up
 
 # do not modify below this line
 script="$root"/workflow/scripts/06_quantify_strains.R

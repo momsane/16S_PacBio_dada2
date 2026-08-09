@@ -97,7 +97,7 @@ if (length(args) != 8){
 
 set.seed(42)
 
-if (facet_var %in% c("Kingdom", "Phylum", "Class", "Family", "Order", "Genus", "Species")){
+if (facet_var %in% c("Kingdom", "Phylum", "Class", "Family", "Order", "Genus", "Species", "Cluster", "Strain")){
   cat("Error: the provided facet_var is conflicting with taxonomic rank names! Please change the name of this variable before continuing.\n")
   quit(save="no")
 }
@@ -124,7 +124,14 @@ tab <- otu_table(ps, taxa_are_rows=F) %>% as("matrix") # samples are rows and AS
 
 ## remove samples with zero reads
 zeroes <- names(which(apply(tab,1,sum)==0))
-# ps <- subset_samples(ps, !(SampleID %in% zeroes))
+ps <- subset_samples(ps, !(SampleID %in% zeroes))
+
+long <- psmelt(ps) %>% 
+  select(-"Sample") %>% 
+  dplyr::rename(
+    ASV = OTU,
+    read_count = Abundance
+  )
 
 tax <- as.data.frame(tax_table(ps))
 tax <- tax %>% 
@@ -160,12 +167,7 @@ if ((input.qpcr != "") & (abundance_col != "")){
   cat("Adding qPCR data\n")
   qpcr <- read.table(input.qpcr, sep = "\t", header = T)
   # compute ASV absolute abundance
-  long <- psmelt(ps) %>% 
-    select(-"Sample") %>% 
-    dplyr::rename(
-      ASV = OTU,
-      read_count = Abundance
-    ) %>%
+  asv_abs <- long %>%
     arrange(SampleID, ASV, Cluster) %>% 
     group_by(SampleID) %>% 
     mutate(
@@ -178,7 +180,7 @@ if ((input.qpcr != "") & (abundance_col != "")){
     mutate(ASV_abs_abun = round(rel_abun*.data[[abundance_col]]), .after="rel_abun")
   
   # extract samples with no absolute abundance
-  samples_noqpcr <- unique(long$SampleID[is.na(long[[abundance_col]])])
+  samples_noqpcr <- unique(asv_abs$SampleID[is.na(asv_abs[[abundance_col]])])
   
   if (length(samples_noqpcr) != 0){
     cat("The samples below do not have any qPCR data. Strain counts will be computed separately and based on read counts.\n")
@@ -187,14 +189,14 @@ if ((input.qpcr != "") & (abundance_col != "")){
     
     # re-shape data as matrix like tab
     tab2 <- df_to_matrix(
-      long %>% filter(!(SampleID %in% samples_noqpcr)),
+      asv_abs %>% filter(!(SampleID %in% samples_noqpcr)),
       rownames_col = "SampleID",
       names_col = "ASV",
       values_col = "ASV_abs_abun"
     )
     
     tab3 <- df_to_matrix(
-      long %>% filter(SampleID %in% samples_noqpcr),
+      asv_abs %>% filter(SampleID %in% samples_noqpcr),
       rownames_col = "SampleID",
       names_col = "ASV",
       values_col = "read_count"
@@ -203,7 +205,7 @@ if ((input.qpcr != "") & (abundance_col != "")){
   } else {
     
     tab2 <- df_to_matrix(
-      long,
+      asv_abs,
       rownames_col = "SampleID",
       names_col = "ASV",
       values_col = "ASV_abs_abun"
@@ -213,7 +215,7 @@ if ((input.qpcr != "") & (abundance_col != "")){
   
   ## save long table
   write.table(
-    long,
+    asv_abs,
     file.path(out.quant, "sample_ASV_table_long_qpcr.tsv"),
     sep = "\t",
     col.names = T,
@@ -305,7 +307,11 @@ solve_matC <- function(matA, matB, name){
   matB <- matB[, strains_keep]
   
   set.seed(42)
-  matC = round(qr.solve(matB,matA))
+  matC = qr.solve(matB,matA) # keep fractional values
+  eps <- 0.1 # minimal value to consider count non-zero -> if a strain has 4 copies, eps=1/4
+  matC[matC < eps] <- 0 # QR can lead to small negative values instead of 0 -> replace them
+  matC <- abs(matC) # ensure zeroes are positive
+  
   ## compute relative abundance
   matC_rel <- 100*scale(matC, center = FALSE, scale = colSums(matC))
   
@@ -325,7 +331,7 @@ solve_matC <- function(matA, matB, name){
 calc_detect_asvs <- function(tab_clusters, tab_otu){
   
   # pivot to long table
-  d1 <- as.data.frame(tab_clusters) %>%
+  df <- as.data.frame(tab_clusters) %>%
     mutate(cluster = rownames(tab_clusters), .before = 1) %>% 
     pivot_longer(colnames(tab_clusters), names_to = "SampleID", values_to = "read_count") %>%
     left_join(clusters[ ,c("cluster", "strain", "n_copies")], by = "cluster") %>%
@@ -337,20 +343,29 @@ calc_detect_asvs <- function(tab_clusters, tab_otu){
       n_partial_ASVs = sum(ASV_partial_detect == TRUE),
       n_ASVs = n_distinct(cluster),
       total_copies = sum(n_copies),
-      sum_reads = sum(read_count)
+      .groups="drop"
     ) %>%
     mutate(
       prop_detected_ASVs = n_detected_ASVs/n_ASVs,
       prop_partial_ASVs = n_partial_ASVs/n_ASVs
     )
   
-  # add total read count to compute MGEE later
-  readcounts <- apply(tab_otu,1,sum)
-  d2 <- data.frame(SampleID = names(readcounts), total_sample_reads = readcounts)
-  d1 <- d1 %>% 
-    left_join(d2, by = "SampleID")
+  # add read count per strain and sample
+  strain_reads <- long %>% 
+    group_by(SampleID, Strain) %>% 
+    summarize(sum_reads_strain = sum(read_count), .groups="drop") %>% 
+    filter(!is.na(Strain))
   
-  return(d1)
+  # add total read count per sample to compute MGEE later
+  depth <- data.frame(
+    SampleID = rownames(tab_otu),
+    total_sample_reads = apply(tab_otu,1,sum)
+  )
+  df <- df %>% 
+    left_join(depth, by = "SampleID") %>% 
+    left_join(strain_reads, by = c("SampleID", "Strain"))
+  
+  return(df)
 }
 
 
@@ -684,12 +699,11 @@ run_inext <- function(knots = 40, maxraref = numeric(), input, n = numCores){
     inextqd <- dt$iNextEst$size_based %>%
       dplyr::rename(SampleID = Assemblage)
     
-    # save results to file
+    # save results to file (1 per chunk)
     write.table(inextqd, 
-                file = inext_file,
+                file = paste0(sub(".tsv", "", inext_file), "_", i),
                 sep = "\t", 
-                append = TRUE, 
-                col.names = !file.exists(inext_file),
+                col.names = TRUE,
                 row.names = FALSE,
                 quote = FALSE
     )
@@ -706,22 +720,37 @@ run_inext <- function(knots = 40, maxraref = numeric(), input, n = numCores){
   
   cat("Reading and plotting results\n")
   
-  # Read data
-  inextqd <- read_tsv(inext_file, show_col_types = F)
+  # read data
+  inextqd_chunks <- lapply(
+    paste(sub(".tsv", "", inext_file), "_", c(1:n), sep = ""),
+    read_tsv,
+    show_col_types = F
+  )
   
-  # remove duplicated rows
-  inextqd <- inextqd %>% 
-    group_by(SampleID, m, Order.q) %>% 
-    filter(SC.LCL == min(SC.LCL)) %>%
+  inextqd <- do.call(rbind, inextqd_chunks)
+  
+  # remove duplicated rows generated by iNEXT (due to sampling and rounding problems)
+  inextqd <- inextqd %>%
+    group_by(SampleID, m, Order.q) %>%
+    mutate(dupl = row_number()) %>% 
+    filter(dupl == 1) %>% 
+    ungroup() %>%
+    select(-"dupl") %>%
     arrange(SampleID, Order.q, m)
   
-  # Overwrite file
-  write.table(inextqd, 
+  # save results to file
+  write.table(inextqd,
               file = inext_file,
-              sep = "\t", 
+              sep = "\t",
               col.names = TRUE,
               row.names = FALSE,
               quote = FALSE
+  )
+  
+  # remove old files
+  lapply(
+    paste(sub(".tsv", "", inext_file), "_", c(1:n), sep = ""),
+    file.remove
   )
   
   # create plot
@@ -758,7 +787,7 @@ run_inext <- function(knots = 40, maxraref = numeric(), input, n = numCores){
         legend.background = element_rect(fill=alpha('white', 0.4))
       ) +
       facet_wrap( ~ Order.q, scales = "free_y")
-  
+    
   } else {
     
     qd.plot <- ggplot(
@@ -821,7 +850,7 @@ if (maxraref <= 0){
   cl <- makeCluster(numCores)
   registerDoParallel(cl)
   
-  run_inext(knots = 40, maxraref = maxraref, input = C)
+  run_inext(knots = 40, maxraref = maxraref, input = ceiling(C)) # rounding up to nearest integer to prevent problems
   
   ### Stop cluster ###
   stopCluster(cl)
