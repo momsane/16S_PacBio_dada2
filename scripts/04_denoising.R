@@ -178,11 +178,11 @@ if (file.exists(file.path(out.denois, "denoised_seqs.rds"))){
   if (db2 == ""){
     cat("No priors given\n")
     if (pool=="T"){
-      dds <- dada(filtered_trimmed_reads_paths, err=error_model, pool=TRUE, multithread=TRUE, verbose = T)
+      dds <- dada(filtered_trimmed_reads_paths, err=error_model, pool=TRUE, multithread=TRUE, BAND_SIZE=32, verbose = T)
     } else if (pool=="pseudo") {
-      dds <- dada(filtered_trimmed_reads_paths, err=error_model, pool="pseudo", multithread=TRUE, verbose = T)
+      dds <- dada(filtered_trimmed_reads_paths, err=error_model, pool="pseudo", multithread=TRUE, BAND_SIZE=32, verbose = T)
     } else if (pool=="F") {
-      dds <- dada(filtered_trimmed_reads_paths, err=error_model, pool=FALSE, multithread=TRUE, verbose = T)
+      dds <- dada(filtered_trimmed_reads_paths, err=error_model, pool=FALSE, multithread=TRUE, BAND_SIZE=32, verbose = T)
     } else {
       stop("Incorrect pooling option provided\n")
     }
@@ -190,11 +190,11 @@ if (file.exists(file.path(out.denois, "denoised_seqs.rds"))){
     cat(paste0("Using ", db2, " as priors\n"))
     my_priors <- getSequences(db2)
     if (pool=="T"){
-      dds <- dada(filtered_trimmed_reads_paths, err=error_model, pool=TRUE, priors=my_priors, multithread=TRUE, verbose = T)
+      dds <- dada(filtered_trimmed_reads_paths, err=error_model, pool=TRUE, priors=my_priors, multithread=TRUE, BAND_SIZE=32, verbose = T)
     } else if (pool=="pseudo") {
-      dds <- dada(filtered_trimmed_reads_paths, err=error_model, pool="pseudo", priors=my_priors, multithread=TRUE, verbose = T)
+      dds <- dada(filtered_trimmed_reads_paths, err=error_model, pool="pseudo", priors=my_priors, multithread=TRUE, BAND_SIZE=32, verbose = T)
     } else if (pool=="F") {
-      dds <- dada(filtered_trimmed_reads_paths, err=error_model, pool=FALSE, priors=my_priors, multithread=TRUE, verbose = T)
+      dds <- dada(filtered_trimmed_reads_paths, err=error_model, pool=FALSE, priors=my_priors, multithread=TRUE, BAND_SIZE=32, verbose = T)
     } else {
       stop("Incorrect pooling option provided\n")
     }
