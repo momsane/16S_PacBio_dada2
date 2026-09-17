@@ -72,28 +72,16 @@ if(!require(iNEXT)){
 
 args <- commandArgs(trailingOnly = TRUE)
 
-if (length(args) != 8){
-  stop(" Usage: 06_quantify_strains.R <phyloseq> <cd-hit_clusters_tax_full> <qpcr> <abundance_col> <facet_var> <max_cells_raref> <quant_results_dir> <plots_dir>", call.=FALSE)
+if (length(args) != 2){
+  stop(" Usage: 06_quantify_strains.R <project_dir> <configfile>", call.=FALSE)
 } else {
-  input.ps <- args[1] # phyloseq object resulting from 05_assign_taxonomy
-  input.clusters <- args[2] # table of ASVs with their assigned cd-hit cluster and user-input taxonomy
-  input.qpcr <- args[3] # qpcr data, if available
-  abundance_col <- args[4] # name of the column in qpcr containing the abundance in the sample
-  facet_var <- args[5] # one column in the metadata table to facet the taxonomy plot, put "" if not needed
-  maxraref <- args[6] # maximum number of 'cells' to extrapolate rarefaction curves
-  out.quant <- args[7] # folder to write quantification results
-  out.plots <- args[8] # folder to write plots
+  root <- args[1]
+  configfile <- args[2]
 }
 
-# root <- "/Volumes/RECHERCHE/FAC/FBM/DMF/pengel/general_data/D2c/mgarcia/20240708_mgarcia_syncom_assembly/pacbio_analysis/run1_MD_bees"
-# input.ps <- file.path(root, "results", "assign_taxonomy", "phyloseq_object_filtered_nonrarefied.RDS")
-# input.clusters <- file.path(root, "workflow", "config", "all_16S_cd-hit_clusters_tax_full.tsv")
-# input.qpcr <- "/Volumes/RECHERCHE/FAC/FBM/DMF/pengel/general_data/D2c/mgarcia/20240708_mgarcia_syncom_assembly/absolute_quantification_results/03_qPCR_results_analyzed.tsv"
-# abundance_col <- "copies_16S_sample"
-# facet_var <- "SampleType"
-# maxraref <- -1
-# out.quant <- file.path(root, "results", "quantify_strains")
-# out.plots <- file.path(root, "plots")
+### Source config file ###
+
+source(configfile)
 
 set.seed(42)
 
@@ -102,7 +90,10 @@ if (facet_var %in% c("Kingdom", "Phylum", "Class", "Family", "Order", "Genus", "
   quit(save="no")
 }
 
-### Create outdirs ###
+### Define and create outdirs ###
+
+out.quant <- file.path(root, "results", "quantify_strains")
+out.plots <- file.path(root, "plots")
 
 cat("\nCreating directories\n")
 
@@ -116,7 +107,7 @@ cat("Reading inputs and extracting info\n")
 ps <- readRDS(input.ps)
 clusters <- read.table(input.clusters, sep = "\t", header = T)
 
-maxraref <- as.numeric(maxraref)
+maxraref_strains <- as.numeric(maxraref_strains)
 
 ### Get tables ###
 
@@ -837,7 +828,7 @@ run_inext <- function(knots = 40, maxraref = numeric(), input, n = numCores){
   
 }
 
-if (maxraref <= 0){
+if (maxraref_strains <= 0){
   cat("Skipping rarefaction curves\n")
 } else {
   cat("Generating rarefaction curves\n")
@@ -850,7 +841,7 @@ if (maxraref <= 0){
   cl <- makeCluster(numCores)
   registerDoParallel(cl)
   
-  run_inext(knots = 40, maxraref = maxraref, input = ceiling(C)) # rounding up to nearest integer to prevent problems
+  run_inext(knots = 40, maxraref = maxraref_strains, input = ceiling(C)) # rounding up to nearest integer to prevent problems
   
   ### Stop cluster ###
   stopCluster(cl)

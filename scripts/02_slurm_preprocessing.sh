@@ -19,44 +19,17 @@ CONDA_HOME=/work/FAC/FBM/DMF/pengel/general_data/mgarci14/miniforge3 # Path to C
 source $CONDA_HOME/etc/profile.d/conda.sh # Source Conda initialization script
 conda activate R # Activate Conda env
 
-# Variables to modify/comment if needed
+#  modify the path to your project folder
 root=/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees
-#raw_fastq_dir="$root"/data/raw_reads # if you did not pre-rarefy
-raw_fastq_dir="$root"/results/prerarefied_reads # if you pre-rarefied
-fwd_primer=AGRGTTYGATYMTGGCTCAG
-rev_primer=RGYTACCTTGTTACGACTT
-minLen=1400
-maxLen=1600
-maxEE=4 # use 2 for 'normal' PacBio libraries, 3-4 for Kinnex libraries
-overwrite=F # whether to overwrite potential existing files or not; useful if your job did not finish in time
 
 # do not modify below this line
+
 script="$root"/workflow/scripts/02_preprocessing.R
-out_preproc="$root"/results/preprocessing
-out_plots="$root"/plots
+config="$root"/workflow/config/config.R
 
-# Execute the R script
-
-echo "Parameters:"
-echo input.raw: "$raw_fastq_dir"
-echo fwd.primer: "$fwd_primer"
-echo rev.primer: "$rev_primer"
-echo minLen: "$minLen"
-echo maxLen: "$maxLen"
-echo maxEE: "$maxEE"
-echo overwrite: "$overwrite"
-echo out.preproc: "$out_preproc"
-echo out.plots: "$out_plots"
-
+## execute the R script
 Rscript --vanilla "$script" \
-    "$raw_fastq_dir" \
-    "$fwd_primer" \
-    "$rev_primer" \
-    "$minLen" \
-    "$maxLen" \
-    "$maxEE" \
-    "$overwrite" \
-    "$out_preproc" \
-    "$out_plots"
+    "$root" \
+    "$config"
 
 echo -e "$(date)"

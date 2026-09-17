@@ -78,32 +78,16 @@ if(!require(ggnested)){
 
 args <- commandArgs(trailingOnly = TRUE)
 
-if (length(args) != 10){
-  stop(" Usage: 05_assign_taxonomy.R <ASV_table> <metadata_table.tsv> <read_count_table> <db_tax> <db_species> <rarefy_to> <facet_var> <tax_results_dir> <plots_dir>", call.=FALSE)
+if (length(args) != 2){
+  stop(" Usage: 05_assign_taxonomy.R <project_dir> <configfile>", call.=FALSE)
 } else {
-  input.asvs <- args[1] # ASV table (no chimera)
-  input.metadata <- args[2] # sample metadata table, tab-separated, first column is the the sample name
-  input.readcounts <- args[3] # read counts at different stages of the pipeline
-  db1 <- args[4] # taxonomy database for assignTaxonomy (GreenGenes2, SILVA, or custom)
-  db2 <- args[5] # taxonomy database for addSpecies (SILVA or custom), put "" if not needed
-  min_boot <- args[6] # numerical threshold to retain taxonomic assignment
-  rarefy_to <- args[7] # number of reads to rarefy to; if <=0, no rarefaction
-  facet_var <- args[8] # one column in the metadata table to facet the taxonomy plot, put "" if not needed
-  out.tax <- args[9] # folder to write denoising results
-  out.plots <- args[10] # folder to write plots
+  root <- args[1]
+  configfile <- args[2]
 }
 
-# root <- "/Volumes/RECHERCHE/FAC/FBM/DMF/pengel/general_data/D2c/mgarcia/20240708_mgarcia_syncom_assembly/pacbio_analysis/run1_MD_bees"
-# input.asvs <- file.path(root, "results", "denoising", "ASV_samples_table_noChim.rds")
-# input.metadata <- file.path(root, "workflow", "config", "metadata.tsv")
-# input.readcounts <- file.path(root, "results", "denoising", "read_counts_steps.tsv")
-# db1 <- file.path(root, "data", "databases", "amplicon_based_db/syncom_custom_db_toSpecies_withAmel_trainset.fa")
-# db2 <- file.path(root, "data", "databases", "amplicon_based_db/syncom_custom_db_addSpecies.fa")
-# min_boot <- 50
-# rarefy_to <- -1
-# facet_var <- "SampleType"
-# out.tax <- file.path(root, "results", "assign_taxonomy")
-# out.plots <- file.path(root, "plots")
+### Source config file ###
+
+source(configfile)
 
 rank_names <- c("Kingdom", "Phylum", "Class", "Family", "Order", "Genus", "Species", "Strain", "Cluster", "ASV")
 if (facet_var %in% rank_names){
@@ -111,7 +95,10 @@ if (facet_var %in% rank_names){
   quit(save="no")
 }
 
-### Create outdirs ###
+### Define and create outdirs ###
+
+out.tax <- file.path(root, "results", "assign_taxonomy")
+out.plots <- file.path(root, "plots")
 
 cat("\nCreating directories\n")
 
@@ -120,7 +107,11 @@ dir.create(out.tax, recursive = TRUE, showWarnings = FALSE)
 
 ### Inputs ###
 
-rarefy_to <- as.numeric(rarefy_to)
+input.asvs <- file.path(root, "results", "denoising", "ASV_samples_table_noChim.rds")
+input.metadata <- file.path(root, "workflow", "config", "metadata.tsv")
+input.readcounts <- file.path(root, "results", "denoising", "read_counts_steps.tsv")
+
+rarefy_taxonomy <- as.numeric(rarefy_taxonomy)
 min_boot <- as.numeric(min_boot)
 
 ASV_samples_table_noChim <- readRDS(input.asvs)
@@ -420,15 +411,15 @@ write.table(
 
 ### Rarefy reads if needed ###
 
-if (rarefy_to <= 0){
+if (rarefy_taxonomy <= 0){
   cat("No rarefaction\n")
   ps.final <- ps
   
 } else {
   
   # rarefy reads
-  cat(paste0("Rarefaction to ", rarefy_to, " reads; samples with fewer reads will be removed; ASVs with a subsequent total abundance of 0 will be not removed\n"))
-  ps.raref <- rarefy_even_depth(ps, sample.size=rarefy_to, replace=F, trimOTUs = F, rngseed = 42, verbose=F)
+  cat(paste0("Rarefaction to ", rarefy_taxonomy, " reads; samples with fewer reads will be removed; ASVs with a subsequent total abundance of 0 will be not removed\n"))
+  ps.raref <- rarefy_even_depth(ps, sample.size=rarefy_taxonomy, replace=F, trimOTUs = F, rngseed = 42, verbose=F)
   
   # list samples that are removed
   samples_diff <- setdiff(

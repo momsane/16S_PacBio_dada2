@@ -62,31 +62,21 @@ if(!require(dada2)){
 
 args <- commandArgs(trailingOnly = TRUE)
 
-if (length(args) != 9){
-  stop(" Usage: 02_preprocessing.R <raw_reads_dir> <fwd_primer_sequence> <rev_primer_sequence> <min_read_length> <max_read_length> <maxEE> <overwrite> <preproc_results_dir> <plots_dir>", call.=FALSE)
+if (length(args) != 2){
+  stop(" Usage: 02_preprocessing.R <project_dir> <configfile>", call.=FALSE)
 } else {
-  input.raw <- args[1] # folder with all raw read files (if you have pre-rarefied the reads, give the folder with the pre-rarefied fastq files)
-  fwd.primer <- args[2] # forward primer sequence
-  rev.primer <- args[3] # reverse primer sequence
-  minLen <- args[4] # lower bound for read length, for filterAndTrim
-  maxLen <- args[5] # upper bound for read length, for filterAndTrim
-  maxEE <- args[6] # max number of errors per read
-  overwrite <- args[7] # whether to overwrite existing files or not
-  out.preproc <- args[8] # folder to write pre-processing results
-  out.plots <- args[9] # folder to write plots (can be the same folder throughout the pipeline)
+  root <- args[1]
+  configfile <- args[2]
 }
 
-# root <- file.path("/Volumes", "D2c", "mgarcia", "20240708_mgarcia_syncom_assembly", "pacbio_analysis", "run1_bees")
-# input.raw <- file.path(root, "results", "prerarefied_reads")
-# fwd.primer <- "AGRGTTYGATYMTGGCTCAG"
-# rev.primer <- "RGYTACCTTGTTACGACTT"
-# minLen <- 1200
-# maxLen <- 1700
-# maxEE <- 3
-# out.preproc <- file.path(root, "results", "preprocessing")
-# out.plots <- file.path(root, "plots")
+### Source config file ###
 
-### Create outdirs ###
+source(configfile)
+
+### Define and create outdirs ###
+
+out.preproc <- file.path(root, "results", "preprocessing")
+out.plots <- file.path(root, "plots")
 
 cat("\nCreating directories\n")
 

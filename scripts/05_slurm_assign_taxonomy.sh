@@ -19,48 +19,17 @@ CONDA_HOME=/work/FAC/FBM/DMF/pengel/general_data/mgarci14/miniforge3 # Path to C
 source $CONDA_HOME/etc/profile.d/conda.sh # Source Conda initialization script
 conda activate R # Activate Conda env
 
-# Variables to modify if needed
+#  modify the path to your project folder
 root=/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees
-db1="$root"/data/databases/syncom_custom_db_toSpecies_withAmel_trainset.fa
-db2="$root"/data/databases/syncom_custom_db_addSpecies.fa
-min_boot=50 # confidence threshold (0-100) to retain taxonomic assignments based on bootstraps, default is 50
-rarefy_to=-1 # -1=no rarefaction; use rarefaction curves to set this value; do NOT rarefy if running decontamination afterwards
-facet_var=SampleType
 
 # do not modify below this line
+
 script="$root"/workflow/scripts/05_assign_taxonomy.R
-asvs="$root"/results/denoising/ASV_samples_table_noChim.rds
-metadata="$root"/workflow/config/metadata.tsv
-readcounts="$root"/results/denoising/read_counts_steps.tsv
-out_tax="$root"/results/assign_taxonomy
-out_plots="$root"/plots
+config="$root"/workflow/config/config.R
 
-dos2unix "$metadata"
-
-# Execute the R script
-
-echo "Parameters:"
-echo input.asvs: "$asvs"
-echo input.metadata: "$metadata"
-echo input.readcounts: "$readcounts"
-echo db1: "$db1"
-echo db2: "$db2"
-echo min_boot: "$min_boot"
-echo rarefy_to: "$rarefy_to"
-echo facet_var: "$facet_var"
-echo out.tax: "$out_tax"
-echo out.plots: "$out_plots"
-
+## execute the R script
 Rscript --vanilla "$script" \
-    "$asvs" \
-    "$metadata" \
-    "$readcounts" \
-    "$db1" \
-    "$db2" \
-    "$min_boot" \
-    "$rarefy_to" \
-    "$facet_var" \
-    "$out_tax" \
-    "$out_plots"
+    "$root" \
+    "$config"
 
 echo -e "$(date)"

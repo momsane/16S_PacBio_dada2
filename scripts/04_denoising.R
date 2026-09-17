@@ -57,50 +57,39 @@ if(!require(iNEXT)){
 
 args <- commandArgs(trailingOnly = TRUE)
 
-if (length(args) != 10){
-  stop(" Usage: 04_denoising.R <processed_reads_dir> <read_count_table> <max_reads_derep> <error_model> <max_bases_errormodel> <priors_db> <pool_T_F> <max_reads_raref> <denoise_results_dir> <plots_dir>", call.=FALSE)
+if (length(args) != 2){
+  stop(" Usage: 04_denoisig.R <project_dir> <configfile>", call.=FALSE)
 } else {
-  input.reads <- args[1] # folder with all pre-processed reads
-  input.readcounts <- args[2] # table reporting the number of reads at each step
-  maxReads <- args[3] # max number of reads to load at once for dereplication
-  errModel <- args[4] # dada2-provided function to estimate the error model
-  maxBases <- args[5] # max number of bases to use for error model inference
-  db2 <- args[6] # database of ASVs expected in the samples
-  pool <- args[7] # "T" or "pseudo" or "F", whether to pool samples for ASV inference
-  maxraref <- args[8] # maximum number of reads to extrapolate rarefaction curves
-  out.denois <- args[9] # folder to write denoising results
-  out.plots <- args[10] # folder to write plots
+  root <- args[1]
+  configfile <- args[2]
 }
 
-# root <- file.path("/Volumes", "D2c", "mgarcia", "20240708_mgarcia_syncom_assembly", "pacbio_analysis", "run1_bees")
-# input.reads <- file.path(root, "results", "preprocessing", "trimmed_filtered_reads")
-# input.readcounts <- file.path(root, "results", "preprocessing", "read_count_before_after.tsv")
-# maxReads <- 1E6
-# errModel <- "binnedQualErrfun"
-# maxBases <- 1E10
-# db2 <- file.path(root, "data", "databases", "amplicon_based_db/syncom_custom_db_addSpecies.fa")
-# pool <- "F"
-# maxraref <- 8000
-# out.denois <- file.path(root, "results", "denoising")
-# out.plots <- file.path(root, "plots")
+### Source config file ###
 
-### Create outdirs ###
+source(configfile)
+
+### Define and create outdirs ###
+
+out.denois <- file.path(root, "results", "denoising")
+out.plots <- file.path(root, "plots")
 
 cat("\nCreating directories\n")
 
-dir.create(out.plots, recursive = TRUE, showWarnings = FALSE)
 dir.create(out.denois, recursive = TRUE, showWarnings = FALSE)
+dir.create(out.plots, recursive = TRUE, showWarnings = FALSE)
 
 ### Inputs ###
 
-maxReads <- as.numeric(maxReads)
-maxBases <- as.numeric(maxBases)
-maxraref <- as.numeric(maxraref)
+input.reads <- file.path(root, "results", "preprocessing", "trimmed_filtered_reads")
+input.readcounts <- file.path(root, "results", "preprocessing", "read_count_before_after.tsv")
 
 filtered_trimmed_reads_paths <- list.files(input.reads, full.names=TRUE)
 reads_df <- read.table(input.readcounts, sep = "\t", header = T)
 
 n_samples <- length(unique(reads_df$basename))
+
+maxBases <- as.numeric(maxBases)
+maxraref_denoising <- as.numeric(maxraref_denoising)
 
 ### Build error model ###
 
@@ -384,7 +373,7 @@ cat("Finished plotting global statistics\n")
 
 ## The range of values is split into numCores chunks to run in parallel
 
-run_inext <- function(knots = 50, maxraref = numeric(), input, n = numCores){
+run_inext <- function(knots = 50, maxraref_denoising = numeric(), input, n = numCores){
   
   # define output file and log paths
   inext_file <- file.path(out.denois, "inext_data.tsv")
@@ -406,8 +395,8 @@ run_inext <- function(knots = 50, maxraref = numeric(), input, n = numCores){
   samples_keep <- names(which(depth != 0))
   input2 <- input[,samples_keep]
   
-  # create list of sizes for x knots between 1 and maxraref
-  sizes <- round(c(1,c(2:knots)*maxraref/knots))
+  # create list of sizes for x knots between 1 and maxraref_denoising
+  sizes <- round(c(1,c(2:knots)*maxraref_denoising/knots))
   
   # cut list into chunks for parallel processing
   if (n == 1){
@@ -562,7 +551,7 @@ run_inext <- function(knots = 50, maxraref = numeric(), input, n = numCores){
           x = m,
           y = qD,
           label = SampleID
-        ), size = 3, nudge_x = log10(maxraref*1e-3)
+        ), size = 3, nudge_x = log10(maxraref_denoising*1e-3)
       ) +
       scale_color_manual(name = "", values = c(low = "#669bbc", high = "#e76f51"), labels = c(low = "Lowest depth", high = "Highest depth")) +
       scale_y_continuous(breaks = seq(0,max(inextqd$qD[inextqd$Method != "Extrapolation"])+5,5)) +
@@ -586,7 +575,7 @@ run_inext <- function(knots = 50, maxraref = numeric(), input, n = numCores){
   
 }
 
-if (maxraref <= 0){
+if (maxraref_denoising <= 0){
   cat("Skipping rarefaction curves\n")
 } else {
   cat("Generating rarefaction curves\n")
@@ -599,7 +588,7 @@ if (maxraref <= 0){
   cl <- makeCluster(numCores)
   registerDoParallel(cl)
   
-  run_inext(knots = 50, maxraref = maxraref, input = t(ASV_samples_table_noChim))
+  run_inext(knots = 50, maxraref_denoising = maxraref_denoising, input = t(ASV_samples_table_noChim))
   
   ### Stop cluster ###
   stopCluster(cl)

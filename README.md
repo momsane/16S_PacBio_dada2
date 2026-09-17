@@ -27,12 +27,12 @@ If you have a defined community, you can go beyond 16S copy number abundance and
 
 This is performed by the last step of this pipeline *06_quantify_strains*:
 1. integrate qPCR data of 16S rRNA absolute abundance if the user provides it;
-2. if qPCR data is provided, compute ASV relative abundance then ASV absolute abundance;
+2. if qPCR data is provided, compute ASV relative abundance then ASV absolute abundance ;
 3. estimate genome-equivalents from ASV abundance using QR decomposition, which to simplify is a linear least square solver for matrices.
 
 **Genome-equivalents (GE)** correspond to an estimate of cell counts in your samples. If you did not provide qPCR data, this estimate will remain **compositional**, just like the number of reads. It can then be combined with absolute biomass data like OD<sub>600</sub> to get absolute abundances. If you provide qPCR data, then the output value is **absolute**.
 
-In addition, when the absolute GE value is estimated, the **minimum genome-equivalent estimate (MGEE)** is also computed. This corresponds to the minimal GE value you can obtain if a focal strain got exactly one read across all its copies in a given sample. It depends on the number of 16S rRNA copies in the genome (*k*), the total biomass in the sample (*B*) and the sequencing depth (*R*): $k\frac{B}{R}$.
+In addition, when the absolute GE value is estimated, the **minimum genome-equivalent estimate (MGEE)** is also computed. This corresponds to the minimal GE value you can obtain if a focal strain got exactly one read for one of its copies in a given sample. It depends on the number of 16S rRNA copies in the genome (*k*), the total biomass in the sample (*B*) and the sequencing depth (*R*): $k\frac{B}{R}$.
 
 While this gives some estimate of the "detection limit", it will only reflect a partial GE abundance if the strain has >1 16S rRNA copies in its genome.
 This is why the proportion of detected ASVs (*prop_detected_ASVs*) and the proportion of ASVs detected in fewer than its number of copies (*prop_partial_ASVs*) are also provided to separate fully from partially detected strains.
@@ -43,7 +43,7 @@ This is why the proportion of detected ASVs (*prop_detected_ASVs*) and the propo
 **Important note 1**: this pipeline should be executed independently for separate runs, as the error profile is unique to each run.
 
 **Important note 2**: depending on the type of library you have and how the fastQ files were produced, you need to select between different options for the filtering and denoising steps. 
-- Consensus sequences from a Kinnex library have less passes, therefore the quality is lower. I would recommend using maxEE=3-4 to avoid being too strict.
+- Consensus sequences from a Kinnex library have less passes, therefore the quality is slightly lower. We recommend using maxEE=3-4 to avoid loosing too many reads.
 - The CSS software used to infer consensus sequences bins the quality scores to reduce file size, see [here](https://ccs.how/faq/qv-binning.html). If you have such binned quality scores, you need to choose the appropriate function for the **denoising** step. 
 
 ### Overview
@@ -51,7 +51,7 @@ This is why the proportion of detected ASVs (*prop_detected_ASVs*) and the propo
 Steps of the pipeline:
 
 - *(optional step)* copy and rename raw reads files with sample ID if needed `00_copy_rename_files.sh`
-- *(optional step)* pre-rarefaction of the reads `00_rarefy.sh`
+- *(optional step)* pre-rarefaction of the raw reads `00_rarefy.sh`, useful if some outlier samples had many more reads than the rest
 - quality check on the raw reads `01_fastqc_preproc.sh` and `01_multiqc_preproc.sh`
 - pre-processing of the reads with dada2 (primer removal, length and quality trimming) `02_slurm_preprocessing.sh`
 - quality check on the processed reads `03_fastqc_postproc.sh` and `03_multiqc_posteproc.sh`
@@ -99,20 +99,25 @@ Install all the required conda environments using the .yaml files located in the
 
 ### Data Preparation
 
-Before running the pipeline, you need to prepare some data. All files in `/config` should be tab-separated and in Unix format. The bash scripts include a **dos2unix** command to convert them. Make sure also there is a line return after the last row of the table otherwise it will not be read. Finally, the use of special characters (including spaces) other than _- in file names or tables must be avoided.
+Before running the pipeline, you need to prepare some data. All files in `/config` should be tab-separated and in Unix format. The bash scripts include a **dos2unix** command to convert them. Make sure also there is a line return after the last row of the table otherwise it will not be read. Finally, the use of special characters (including spaces) other than "_" and "-" in file names or tables must be avoided.
 
-1.  **File naming table:** the raw read files you got from the sequencing facility have long non-informative names. If not done already, you will rename them with the SampleID. Create a table like `config/rename_files.tsv` where the first column is the current name of each file, and the second column is the new name. This table has no header. If you have samples from different pools, you will need to create one table per pool because some samples might have the same original name.
+1.  **File naming table:** the raw read files you got from the sequencing facility have long non-informative names. If not done already, you will rename them with the SampleID. Create a table like `config/rename_files.tsv` where the first column is the current name of each file, and the second column is the new name. This table has no header. If you have samples from different pools, you will need to create one table per pool as barcodes are shared between pools.
 2.  **Metadata file:** modify `config/metadata.tsv` according to your samples. You do not need to keep the same columns except for the first one, `SampleID`. This first column must contain the sample names (final filenames without the `.fastq.gz` extension). Make sure there are no empty cells in this table - use NA values if necessary.
 3.  **Read rarefaction table (optional):** if you have very uneven depth in your dataset, you might want to consider rarefying the raw reads to limit unnecessary computation time and resources for large samples. Modify `config/pre_rarefaction.tsv` according to your needs.
 4.  **Raw reads:** you are now ready to copy them from the NAS. Modify the script `00_copy_rename_files.sh` with the correct paths. Then execute it from the login node (*i.e.* use `bash` instead of `sbatch` to submit it). If you have samples from different pools, you will need to execute this script independently for each pool.
 5. **Databases:** you need to provide at least one database to assign taxonomy to your ASVs. Refer to [the dada2 website](https://benjjneb.github.io/dada2/training.html) for more information and links to download the databases.
 
+### Pipeline settings
+
+All pipelines settings can be modified in `config/config.R`. Some parameters should be set only once the previous step of the pipeline is finished (example: "maxraref_denoising").
+
 ### Adapting the scripts
 
 Only the beginning of the `.sh` scripts needs to be modified:
 
+- paths to the log files in the slurm header
 - the commands to initialize conda according to the type of installation you are using
-- the input variables, for instance the path to the root directory
+- the path to the root directory
 - the pre-rarefaction and the fastQC scripts are array jobs (argument `--array` in the slurm header), so you need to modify the range of the arrays. `2-50` means you will process files described in lines 2 to 50 of `config/metadata.tsv`. We start at 2 to skip the header. So your array range should be `2-<number of samples + 1>`
 - you should not need to modify the resource requirements, unless your jobs get killed. Before increasing memory and CPU requests, check the efficiency of your job using `seff <jobid>`.
 
@@ -123,7 +128,7 @@ Only the beginning of the `.sh` scripts needs to be modified:
 To run the other scripts:
 
 1.  **Submit the job to the slurm scheduler:** `sbatch <script_name>.sh`.
-2.  **Monitor the job:** use `Squeue` to check the status of you jobs. **Check the log file after each step**: it will contain not only any error messages but also useful information. 
+2.  **Monitor the job:** use `Squeue` to check the status of you jobs. **Check the log file after each step**: it will contain not only potential error messages but also useful information. 
     
 | Script           | What to check                                       |
 |--------------------|---------------------------------------------------|
@@ -141,7 +146,7 @@ To run the other scripts:
 
 **Note 2:** to use `06_slurm_quantify_strains.sh`, you first need to create your custom database (see below) and run `05_slurm_assign_taxonomy.sh` with this custom database as `db2`.
 
-**Note 3:** while `06_slurm_quantify_strains.sh` with qPCR data, you might need to run it twice on separate subsets of samples if the 16S total abundance variable is different between samples (i.e., you have bees with 16S abundance normalized by actin abundance, and other samples with non-normalized 16S abundance). To do so, split your qPCR data table, and rename the output folder.
+**Note 3:** while `06_slurm_quantify_strains.sh` with qPCR data, you might need to run it twice on separate subsets of samples if the 16S total abundance variable is different between samples (i.e., you have bees with 16S abundance normalized by actin abundance, and other samples with non-normalized 16S abundance). To do so, split your qPCR data table, create a config file for each sample type, and rename the output folder.
 
 ---
 

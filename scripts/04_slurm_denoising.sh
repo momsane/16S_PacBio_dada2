@@ -19,46 +19,17 @@ CONDA_HOME=/work/FAC/FBM/DMF/pengel/general_data/mgarci14/miniforge3 # Path to C
 source $CONDA_HOME/etc/profile.d/conda.sh # Source Conda initialization script
 conda activate R # Activate Conda env
 
-# Variables to modify
+#  modify the path to your project folder
 root=/work/FAC/FBM/DMF/pengel/general_data/syncom_pacbio_analysis/run1_bees
-errModel=binnedQualErrfun # use 'binnedQualErrfun' if you have binned quality score, or else 'PacBioErrfun'
-db2="$root"/data/databases/syncom_custom_db_addSpecies.fa # give dada a set of expected ASVs, or set to ""
-pool=F # "T" or "pseudo" or "F", whether to pool samples for ASV inference
-maxraref=40000 # use the multiqc output to set this value close to the highest number of reads in your samples, or set -1 to skip (not recommended)
 
-# do not modify below this line, unless you know what you are doing
-maxReads=1000000 # reduce if memory issues arise
-maxBases=10000000000 # 1E10 strongly recommended
+# do not modify below this line
+
 script="$root"/workflow/scripts/04_denoising.R
-out_denois="$root"/results/denoising
-out_plots="$root"/plots
-processed_fastq_dir="$root"/results/preprocessing/trimmed_filtered_reads
-readcounts="$root"/results/preprocessing/read_count_before_after.tsv
+config="$root"/workflow/config/config.R
 
-# Execute the R script
-
-echo "Parameters:"
-echo input.reads: "$processed_fastq_dir"
-echo input.readcounts: "$readcounts"
-echo maxReads: "$maxReads"
-echo errModel: "$errModel"
-echo maxBases: "$maxBases"
-echo db2: "$db2"
-echo pool: "$pool"
-echo maxraref: "$maxraref"
-echo out.denois: "$out_denois"
-echo out.plots: "$out_plots"
-
+## execute the R script
 Rscript --vanilla "$script" \
-    "$processed_fastq_dir" \
-    "$readcounts" \
-    "$maxReads" \
-    "$errModel" \
-    "$maxBases" \
-    "$db2" \
-    "$pool" \
-    "$maxraref" \
-    "$out_denois" \
-    "$out_plots"
+    "$root" \
+    "$config"
 
 echo -e "$(date)"
