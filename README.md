@@ -99,17 +99,17 @@ Install all the required conda environments using the .yaml files located in the
 
 ### Data Preparation
 
-Before running the pipeline, you need to prepare some data. All files in `/config` should be tab-separated and in Unix format. The bash scripts include a **dos2unix** command to convert them. Make sure also there is a line return after the last row of the table otherwise it will not be read. Finally, the use of special characters (including spaces) other than "_" and "-" in file names or tables must be avoided.
+Before running the pipeline, you need to prepare some data. All tables in `/config` should be tab-separated and in Unix format. The bash scripts include a **dos2unix** command to convert them. Make sure also there is a line return after the last row of the table otherwise it will not be read. Finally, the use of special characters (including spaces) other than "_" and "-" in file names or tables must be avoided.
 
 1.  **File naming table:** the raw read files you got from the sequencing facility have long non-informative names. If not done already, you will rename them with the SampleID. Create a table like `config/rename_files.tsv` where the first column is the current name of each file, and the second column is the new name. This table has no header. If you have samples from different pools, you will need to create one table per pool as barcodes are shared between pools.
 2.  **Metadata file:** modify `config/metadata.tsv` according to your samples. You do not need to keep the same columns except for the first one, `SampleID`. This first column must contain the sample names (final filenames without the `.fastq.gz` extension). Make sure there are no empty cells in this table - use NA values if necessary.
 3.  **Read rarefaction table (optional):** if you have very uneven depth in your dataset, you might want to consider rarefying the raw reads to limit unnecessary computation time and resources for large samples. Modify `config/pre_rarefaction.tsv` according to your needs.
-4.  **Raw reads:** you are now ready to copy them from the NAS. Modify the script `00_copy_rename_files.sh` with the correct paths. Then execute it from the login node (*i.e.* use `bash` instead of `sbatch` to submit it). If you have samples from different pools, you will need to execute this script independently for each pool.
+4.  **Raw reads:** you are now ready to copy them from the NAS. Modify the script `00_copy_rename_files.sh` with the correct paths. If you have samples from different pools, you will need to execute this script independently for each pool.
 5. **Databases:** you need to provide at least one database to assign taxonomy to your ASVs. Refer to [the dada2 website](https://benjjneb.github.io/dada2/training.html) for more information and links to download the databases.
 
 ### Pipeline settings
 
-All pipelines settings can be modified in `config/config.R`. Some parameters should be set only once the previous step of the pipeline is finished (example: "maxraref_denoising").
+All pipelines settings can be modified in `config/config.R`. Some parameters should be set only once the previous step of the pipeline is finished (example: "maxraref_denoising" once step 03 is done).
 
 ### Adapting the scripts
 
@@ -146,7 +146,7 @@ To run the other scripts:
 
 **Note 2:** to use `06_slurm_quantify_strains.sh`, you first need to create your custom database (see below) and run `05_slurm_assign_taxonomy.sh` with this custom database as `db2`.
 
-**Note 3:** while `06_slurm_quantify_strains.sh` with qPCR data, you might need to run it twice on separate subsets of samples if the 16S total abundance variable is different between samples (i.e., you have bees with 16S abundance normalized by actin abundance, and other samples with non-normalized 16S abundance). To do so, split your qPCR data table, create a config file for each sample type, and rename the output folder.
+**Note 3:** while `06_slurm_quantify_strains.sh` with qPCR data, you might need to run it twice on separate subsets of samples if the 16S total abundance variable is different between samples (*i.e.*, you have bees with 16S abundance normalized by actin abundance, and other samples with non-normalized 16S abundance). To do so, split your qPCR data table, create a config file for each sample type, and rename the output folder after running the script for each subset.
 
 ---
 
