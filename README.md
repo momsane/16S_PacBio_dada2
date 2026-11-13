@@ -43,7 +43,7 @@ This is why the proportion of detected ASVs (*prop_detected_ASVs*) and the propo
 **Important note 1**: this pipeline should be executed independently for separate runs, as the error profile is unique to each run.
 
 **Important note 2**: depending on the type of library you have and how the fastQ files were produced, you need to select between different options for the filtering and denoising steps. 
-- Consensus sequences from a Kinnex library have less passes, therefore the quality is slightly lower. We recommend using maxEE=3-4 to avoid loosing too many reads.
+- Consensus sequences from a Kinnex library have fewer passes, therefore the quality is slightly lower. We recommend using maxEE=3-4 to avoid loosing too many reads.
 - The CSS software used to infer consensus sequences bins the quality scores to reduce file size, see [here](https://ccs.how/faq/qv-binning.html). If you have such binned quality scores, you need to choose the appropriate function for the **denoising** step. 
 
 ### Overview
@@ -99,7 +99,7 @@ Install all the required conda environments using the .yaml files located in the
 
 ### Data Preparation
 
-Before running the pipeline, you need to prepare some data. All tables in `/config` should be tab-separated and in Unix format. The bash scripts include a **dos2unix** command to convert them. Make sure also there is a line return after the last row of the table otherwise it will not be read. Finally, the use of special characters (including spaces) other than "_" and "-" in file names or tables must be avoided.
+Before running the pipeline, you need to prepare some data. All tables in `/config` should be tab-separated. Make sure also there is a line return after the last row (not the case if editing with Excel) of the table otherwise it will not be read. Finally, the use of special characters such as spaces must be avoided.
 
 1.  **File naming table:** the raw read files you got from the sequencing facility have long non-informative names. If not done already, you will rename them with the SampleID. Create a table like `config/rename_files.tsv` where the first column is the current name of each file, and the second column is the new name. This table has no header. If you have samples from different pools, you will need to create one table per pool as barcodes are shared between pools.
 2.  **Metadata file:** modify `config/metadata.tsv` according to your samples. You do not need to keep the same columns except for the first one, `SampleID`. This first column must contain the sample names (final filenames without the `.fastq.gz` extension). Make sure there are no empty cells in this table - use NA values if necessary.

@@ -824,7 +824,7 @@ run_inext <- function(knots = 40, maxraref = numeric(), input, n = numCores){
   }
   
   # save plot
-  ggsave(file.path(out.plots, paste0("06_rarefaction_curves_strains.pdf")), qd.plot, device="pdf", width = 12, height = 8)
+  ggsave(file.path(out.plots, "06_rarefaction_curves_strains.pdf"), qd.plot, device="pdf", width = 12, height = 8)
   
 }
 

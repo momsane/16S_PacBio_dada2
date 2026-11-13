@@ -167,7 +167,12 @@ trim <- foreach(i = seq_along(samples_totrim), .packages = c("dada2")) %dopar% {
   NULL
 }
 
-primer_removal_summary <- read_tsv(file.path(out.preproc, "primer_removal_summary.tsv"), show_col_types = F)
+primer_removal_summary <- read_tsv(file.path(out.preproc, "primer_removal_summary.tsv"), show_col_types = F) %>% 
+  filter(`reads.in` != "reads.in") %>% # remove header if duplicated as a row
+  mutate(
+    reads.in = as.numeric(reads.in),
+    reads.out = as.numeric(reads.out),
+  )
 
 cat(paste0("Mean proportion of reads retained: ", round(mean(primer_removal_summary$reads.out/primer_removal_summary$reads.in),2),"\n"))
 
@@ -242,8 +247,13 @@ filt <- foreach(i = seq_along(samples_tofilt), .packages = c("dada2")) %dopar% {
   NULL
 }
 
-filtering_summary <- read_tsv(file.path(out.preproc, "filtering_summary.tsv"), show_col_types = F)
-
+filtering_summary <- read_tsv(file.path(out.preproc, "filtering_summary.tsv"), show_col_types = F) %>% 
+  filter(`reads.in` != "reads.in") %>% # remove header if duplicated as a row
+  mutate(
+    reads.in = as.numeric(reads.in),
+    reads.out = as.numeric(reads.out),
+    )
+  
 cat(paste0("Mean proportion of reads retained: ", round(mean(filtering_summary$reads.out/filtering_summary$reads.in),2), "\n"))
 
 filtering_summary <- filtering_summary %>%

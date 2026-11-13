@@ -571,7 +571,7 @@ run_inext <- function(knots = 50, maxraref_denoising = numeric(), input, n = num
   }
   
   # save plot
-  ggsave(file.path(out.plots, paste0("04_rarefaction_curves_ASVs.pdf")), qd.plot, device="pdf", width = 12, height = 8)
+  ggsave(file.path(out.plots, "04_rarefaction_curves_ASVs.pdf"), qd.plot, device="pdf", width = 12, height = 8)
   
 }
 
